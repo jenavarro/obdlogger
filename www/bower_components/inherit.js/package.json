@@ -1,0 +1,10 @@
+{
+	"name": "inherit.js",
+	"description": "A small, efficient library for Ruby style classical and multiple inheritance in JavaScript.",
+	"version": "1.0.0",
+	"author": "Greg Burghardt <greg_burghardt@yahoo.com",
+	"homepage": "https://github.com/gburghardt/inherit.js",
+	"repository": {"type": "git", "url": "https://github.com/gburghardt/inherit.js.git"},
+	"main": "lib/function.js",
+	"keywords": ["javascript", "object oriented programming", "classical inheritance", "multiple inheritance"]
+}
