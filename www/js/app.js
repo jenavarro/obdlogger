@@ -15,7 +15,7 @@
  * Author: Javier Navarro
  */
 
-/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer */
+/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer,modeRealTime */
 "use strict";
 
 var bluetoothSerial;
@@ -29,11 +29,22 @@ function onAppReady() {
 }
 
 
-
 document.addEventListener("app.Ready", onAppReady, false) ;
 document.addEventListener("online", onOnline, false);
 
 var btGoogleSheetAPI ='';
+
+var globalLog =[];
+var globalLogEnabled = true;   // disable when generating a build
+
+var pushGlobalLog = function(entry) {
+    if (!globalLogEnabled) return;
+
+    if (globalLog.length>99) {
+        globalLog = globalLog.splice(0,1);
+    }
+    globalLog.push(entry);
+};
 
 //===============================================
 var tryToUploadFile = function() {
@@ -48,9 +59,10 @@ var tryToUploadFile = function() {
                 function gotFile(fileEntry) {
                     fileEntry.file(function(file) {
                         var reader = new FileReader();
+                        pushGlobalLog('Uploading file ' + file.name);
                         var url=btGoogleSheetAPI + '?batch=' + file.name + '&';
                         reader.onloadend = function(e) {
-                            console.log("Text is: "+reader.result);
+                            //console.log("Text is: "+reader.result);
                             if (reader.result ==='') {
                                 deleteFile(fileEntry);
                                 return;
@@ -65,7 +77,7 @@ var tryToUploadFile = function() {
                                 deleteFile(fileEntry);
                                 return;
                             }
-                            console.log('Number of metrics in file: ' + tmpdocs.length);
+                            pushGlobalLog('Number of metrics in file: ' + tmpdocs.length);
                             if (tmpdocs.length===0) {
                                 deleteFile(fileEntry);
                                 return;
@@ -73,8 +85,8 @@ var tryToUploadFile = function() {
 
                             async.eachSeries(tmpdocs, function(item, callback) {
                                 var request = new XMLHttpRequest();
-                                var tmpurl = url + 'ts=' + item.ts + '&name=' + item.name + '&value=' + item.value + '&unit=' + item.unit;
-                                console.log(tmpurl);
+                                var tmpurl = url + 'ts=' + item.ts + '&name=' + item.name + '&value=' + item.value;// + '&unit=' + item.unit;
+                                pushGlobalLog(tmpurl);
                                 request.open('POST',tmpurl,true);
                                 request.onreadystatechange = function() {
                                     if (request.readyState == 4) {
@@ -135,7 +147,7 @@ function onOnline() {
     var networkState = navigator.connection.type;
 
     if (networkState === Connection.WIFI && btGoogleSheetAPI!=='') {
-            console.log('Connection type: ' + networkState + ' will attempt to upload cached data');
+            pushGlobalLog('Connection type: ' + networkState + ' will attempt to upload cached data');
             tryToUploadFile();
     }
 }
@@ -211,7 +223,7 @@ var btDataError = function (data) {
 var btConnectToDevice = function (id,callback) {
     bluetoothSerial.connect(id,
                     function() {
-                        console.log("connected succesful to " + id);
+                        pushGlobalLog("connected succesful to " + id);
                         btConnected = true;
                         bluetoothSerial.subscribe('>',btDataReceived, btDataError);
                         init_communication();
@@ -238,29 +250,27 @@ var btEventEmit = function (event,text) {
         if ( text.value === 'NO DATA' || text.name === undefined || text.value === undefined) {
             return;
         }
+        pushGlobalLog('New metric for ' + text.name);
         inmemorydata.push({ts:Date.now(),name:text.name,value:text.value});
         inmemoryqty++;
         inmemorylastdata[text.name]=text.value;
         if (inmemoryqty>100 && btGoogleSheetAPI!=='' ) {
-            purgeToFile();
+            purgeToFile(inmemorydata);
+            inmemorydata=[];
+            inmemoryqty=0;
         }
-        inmemorydata=[];
-        inmemoryqty=0;
     }
 };
 
-var purgeToFile = function() {
-    console.log('Purge data to log');
+var purgeToFile = function(arrdata) {
     window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function(dir) {
-        console.log('got main dir',dir);
         dir.getFile('tmpdata'+Date.now()+'.txt', {create:true}, function(file) {
-            console.log('got the file', file);
             file.createWriter(function(fileWriter) {
                 fileWriter.seek(fileWriter.length);
 
-                var blob = new Blob([JSON.stringify(inmemorydata)], {type:'text/plain'});
+                var blob = new Blob([JSON.stringify(arrdata)], {type:'text/plain'});
                 fileWriter.write(blob);
-                console.log("ok, in theory i worked");
+                pushGlobalLog("Saved to file ");
             }, function(){
                 console.log('Cannot write to file');
                 });
@@ -493,6 +503,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.livemetrics=[];
     $scope.connectRetry = 0;
     $scope.btGoogleSheetAPI='';
+    $scope.logentries = [];
 
     var disableIntervals = function () {
 
@@ -506,10 +517,11 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             }
         }
         selecteditems=globalvars.getSelectedMetrics();
+        var tmparray=[];
         for (k=0;k<tmpmetrics.length;k++){
                 if (selecteditems.indexOf(tmpmetrics[k].name)>-1) {
                     tmpmetrics[k].metricSelectedToPoll = true;
-                    $scope.livemetrics.push({
+                    tmparray.push({
                         name:tmpmetrics[k].name,
                         description:tmpmetrics[k].description,
                         value:'',
@@ -519,11 +531,16 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     tmpmetrics[k].metricSelectedToPoll = false;
                 }
         }
+        $scope.livemetrics = tmparray;
         $scope.metrics = tmpmetrics;
     };
 
     $scope.readDefaultMetrics = function() {
         fetchDefaultMetrics();
+    };
+
+    $scope.readLogEntries = function (){
+        $scope.logentries = globalLog;
     };
 
     $scope.metricToPollClick = function(name,value){
@@ -581,7 +598,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             }
             fetchDefaultMetrics();
             console.log(id);
-            console.log($scope.btdevices);
+            //console.log($scope.btdevices);
             var devname = $scope.btdevices.devices[$scope.btdevices.devices.map(function(e)
                                                                                 {
                 return e.id;
@@ -590,7 +607,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     $scope.livestats.connectionstatus=' (Connecting to ' + devname + ' (' + ($scope.connectRetry) +')';
                     btConnectToDevice(id,function(result) {
                         $scope.connectRetry++;
-                        if ($scope.connectRetry>4){
+                        if ($scope.connectRetry<-1){ //repeat indefinitely
                             $interval.cancel(connectInterval);
                         }
                         if (result){
@@ -636,7 +653,16 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         }
       }
     });
-
+  $stateProvider
+    .state('log', {
+      url: "/log.html",
+      cache:false,
+      views: {
+        'menuContent' : {
+          templateUrl: "log.html"
+        }
+      }
+    });
   $stateProvider
     .state('configuration', {
       url: "/settings.html",
