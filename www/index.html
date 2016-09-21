@@ -188,10 +188,26 @@
                 <p>
                     This software is heavily based on the npm module bluetooth-obd (<a href="https://www.npmjs.com/package/bluetooth-obd">https://www.npmjs.com/package/bluetooth-obd</a>) authored by Eric Smekens and licensed as Apache License 2.0
                 </p>
+                <p/>
+
+                <button class="button button-block" ui-sref="log">View Log
+                </button>
+
             </ion-content>
         </ion-view>
     </script>
+    <script id="log.html" type="text/ng-template">
+        <ion-view view-title="OBD Logger Operational Log">
+            <ion-content class="padding">
+                <ul class="list" ng-init="readLogEntries()">
+                    <li ng-repeat="logentry in logentries track by $index">
+                        {{logentry}}</li>
+                </ul>
 
+
+            </ion-content>
+        </ion-view>
+    </script>
 </body>
 <script src="lib/ionicframework/move.js" type="text/javascript"></script>
 
