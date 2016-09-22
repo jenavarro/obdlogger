@@ -12,6 +12,8 @@ The app will collect live metrics from the car on-board diagnostic computer -RPM
 
 This app is more a proof-of-concept than a stable, feature rich application.
 
+This software is heavily based on the npm module [bluetooth-obd](https://www.npmjs.com/package/bluetooth-obd) authored by Eric Smekens and licensed as Apache License 2.0
+
 ### Main Features
 * Allow capturing live metrics reported by the car engine
 * Allows storing locally and uploading them to a selected Google Spreadsheet via an API
