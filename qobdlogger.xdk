@@ -5,7 +5,7 @@
       "projectTypeName": "com.intel.xdk.projecttype.jsapp",
       "src": "jsapp/template-blank-cordova-project-lite/sample.zip",
       "projectGuid": "7ef9f3e2-776e-461b-8dda-963196affb89",
-      "lastModifiedDate": 1474208285011,
+      "lastModifiedDate": 1474597753837,
       "creationDate": 1464136862032
     },
     "XDK-app-designer": "false",
@@ -191,6 +191,26 @@
           ]
         },
         "description": "Cordova Geolocation Plugin",
+        "data": {},
+        "dependedBy": []
+      },
+      {
+        "id": "cordova-sqlite-storage",
+        "name": "Cordova sqlite storage plugin (core version)",
+        "version": "1.2.2",
+        "originType": "cordova.io",
+        "origin": "cordova-sqlite-storage",
+        "gitref": "",
+        "paramvals": {},
+        "sourceLocation": "plugins/cordova-sqlite-storage",
+        "selectedState": "Included",
+        "checksum": "9c380875",
+        "dependsOn": [],
+        "topLevel": true,
+        "cordovaVersion": ">=6.0.0",
+        "author": "Litehelpers/Various",
+        "permissions": {},
+        "description": "Native interface to SQLite for PhoneGap/Cordova. Allows you to use more storage and provides more flexibility than the standard Web SQL database (window.openDatabase).",
         "data": {},
         "dependedBy": []
       }
