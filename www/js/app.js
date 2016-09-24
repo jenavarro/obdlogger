@@ -503,6 +503,16 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         $scope.logentries = globalLog;
     };
 
+    $scope.selectDefaultMetrics = function() {
+        for (var k = 0; k<$scope.metrics.length;k++){
+            if ($scope.metrics[k].isDefault === true && $scope.metrics[k].metricSelectedToPoll===false ){
+                $scope.metrics[k].metricSelectedToPoll=true;
+            }
+            if ($scope.metrics[k].isDefault === false && $scope.metrics[k].metricSelectedToPoll===true ){
+                $scope.metrics[k].metricSelectedToPoll=false;
+            }
+        }
+    };
     $scope.metricToPollClick = function(name,value){
         var cfg = globalvars.getSelectedMetrics();
         var i = cfg.indexOf(name);

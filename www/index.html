@@ -154,7 +154,9 @@
                 <div class="item item-divider">
                     <i class="icon ion-bluetooth"></i> Metrics to Poll
                 </div>
-
+                <button class="button button-block" ng-click="selectDefaultMetrics()">
+                    Select default metrics
+                </button>
                 <ul class="list" ng-init="readDefaultMetrics()">
                     <li class="item item-toggle" ng-repeat="metric in metrics" ng-model="metric">
                         {{metric.description}}
