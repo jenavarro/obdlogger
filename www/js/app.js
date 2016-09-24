@@ -15,19 +15,32 @@
  * Author: Javier Navarro
  */
 
-/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer,modeRealTime */
+/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer,callback,modeRealTime */
 "use strict";
 
 var bluetoothSerial;
+var db = null;
+var flag_uploading = false;
 
 function onAppReady() {
     if( navigator.splashscreen && navigator.splashscreen.hide ) {   // Cordova API detected
         navigator.splashscreen.hide() ;
         console.log("APPREADY - Now the angular part will be bootstraped");
         angular.bootstrap(document, ['ionicApp']);
+        db = window.sqlitePlugin.openDatabase({name: 'livemetrics.db', location: 'default'});
+        setupdb();
+
     }
 }
 
+var setupdb = function(){
+
+    //CREATE TABLE IF NOT EXISTS
+
+        //db.executeSql('DROP TABLE livemetricstable', [], function(res){},function(err) {});
+        db.executeSql('CREATE TABLE IF NOT EXISTS livemetricstable (rowid INTEGER PRIMARY KEY,ts INT, name text, value text)');
+
+};
 
 document.addEventListener("app.Ready", onAppReady, false) ;
 document.addEventListener("online", onOnline, false);
@@ -46,109 +59,70 @@ var pushGlobalLog = function(entry) {
     globalLog.push(entry);
 };
 
-//===============================================
-var tryToUploadFile = function() {
+var tryToUploadData = function() {
+    flag_uploading = true;
+    var url=btGoogleSheetAPI + '?';
 
-    function processIndividualFile(filename) {
-            window.resolveLocalFileSystemURL(cordova.file.dataDirectory + filename, gotFile, fail);
-
-                function fail(e) {
-                    console.log("FileSystem Error");
-                    console.dir(e);
-                }
-                function gotFile(fileEntry) {
-                    fileEntry.file(function(file) {
-                        var reader = new FileReader();
-                        pushGlobalLog('Uploading file ' + file.name);
-                        var url=btGoogleSheetAPI + '?batch=' + file.name + '&';
-                        reader.onloadend = function(e) {
-                            //console.log("Text is: "+reader.result);
-                            if (reader.result ==='') {
-                                deleteFile(fileEntry);
-                                return;
-                            }
-
-                            var tmpdocs = JSON.parse(reader.result);
-                            if (tmpdocs === undefined) {
-                                deleteFile(fileEntry);
-                                return;
-                            }
-                            if (tmpdocs.constructor !== Array) {
-                                deleteFile(fileEntry);
-                                return;
-                            }
-                            pushGlobalLog('Number of metrics in file: ' + tmpdocs.length);
-                            if (tmpdocs.length===0) {
-                                deleteFile(fileEntry);
-                                return;
-                            }
-
-                            async.eachSeries(tmpdocs, function(item, callback) {
-                                var request = new XMLHttpRequest();
-                                var tmpurl = url + 'ts=' + item.ts + '&name=' + item.name + '&value=' + item.value;// + '&unit=' + item.unit;
-                                pushGlobalLog(tmpurl);
-                                request.open('POST',tmpurl,true);
-                                request.onreadystatechange = function() {
-                                    if (request.readyState == 4) {
-                                        if (request.status == 200 || request.status === 0) {
-                                            return callback(null);
-                                        } else {
-                                            return callback(request.status);
-                                        }
-                                    }
-                                };
-                                request.send();
-                            }, function(err, results) {
-                                if (!err) {
-                                    console.log('Finished processing ' +file.name );
-                                    deleteFile(fileEntry);
-
-                                } else {
-                                    // handle error here
-                                }
-                            });
-                        };
-                        var deleteFile = function(fileEntry){
-                                    fileEntry.remove(function(){
-                                          console.log(file.name + " deleted");
-                                        },function(){
-                                        console.log(file.name + " NOT deleted");
-                                                    });
-                        };
-                        reader.readAsText(file);
-
-                });
-                }
-    }
-
-    function success(entries) {
-        var i;
-        for (i=0; i<entries.length; i++) {
-            if (entries[i].isFile && entries[i].name.substr(0,7) === "tmpdata"){
-                processIndividualFile(entries[i].name);
+    db.executeSql('SELECT * FROM livemetricstable', [], function(res){
+            var tmpdocs =[];
+            console.log('Row count from SELECT: ' + res.rows.length);
+            for (var i = 0; i < res.rows.length; i++)
+            {
+                tmpdocs.push({rowid:res.rows.item(i).rowid, ts:res.rows.item(i).ts, name:res.rows.item(i).name, value:res.rows.item(i).value});
             }
 
-        }
-    }
+            async.eachSeries(tmpdocs, function(item, callbackp) {
+                var request = new XMLHttpRequest();
+                var tmpurl = url + 'ts=' + item.ts + '&name=' + item.name + '&value=' + item.value;// + '&unit=' + item.unit;
+                console.log(tmpurl);
+                request.open('POST',tmpurl,true);
+                request.onreadystatechange = function() {
+                    if (request.readyState == 4) {
+                        if (request.status == 200 || request.status === 0) {
+                            db.executeSql('DELETE FROM livemetricstable WHERE rowid=?',[item.rowid], function(results){
+                                return callbackp(null);
+                                },function(err){
+                                pushGlobalLog('Cannot delete row = ' + item.rowid);
+                                return callbackp('Cannot delete row = ' + item.rowid);
+                            });
+                        } else {
+                            return callbackp(request.status);
+                        }
+                    }
+                };
+                request.send();
+            }, function(err, results) {
+                if (!err) {
+                    // Compact database
+                    db.executeSql('VACUUM',[], function(results){
+                            pushGlobalLog('DB was vacuumed');
+                        },function(err){
+                            pushGlobalLog('ERROR - DB NOT VACUUMed');
+                        });
+                    flag_uploading = false;
+                    pushGlobalLog('processingfile finished succesefully');
+                    callback(null, 'processingfile finished succesefully');
+                } else {
+                    flag_uploading = false;
+                    pushGlobalLog('processingfile finished w/error');
+                    callback(null, 'processingfile finished w/error');
+                }
+            });
 
-    function fail(error) {
-        alert("Failed to list directory contents: " + error.code);
-    }
-
-    window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function (dirEntry) {
-        var directoryReader = dirEntry.createReader();
-        // Get a list of all the entries in the directory
-        directoryReader.readEntries(success,fail);
+    }, function(err){
     });
-
 };
 
 function onOnline() {
     var networkState = navigator.connection.type;
-
-    if (networkState === Connection.WIFI && btGoogleSheetAPI!=='') {
+    if (networkState === Connection.WIFI && btGoogleSheetAPI!=='' ) {
+            if (flag_uploading){
+                console.log('Discarding duplicate trigger, still processing');
+                return;
+            }
+            flag_uploading = true;
             pushGlobalLog('Connection type: ' + networkState + ' will attempt to upload cached data');
-            tryToUploadFile();
+            tryToUploadData();
     }
 }
 
@@ -246,36 +220,22 @@ var inmemorylastdata=[];
 //===========================================================================
 
 var btEventEmit = function (event,text) {
+    var pdata={};
     if (event==='dataReceived') {
         if ( text.value === 'NO DATA' || text.name === undefined || text.value === undefined) {
             return;
         }
         pushGlobalLog('New metric for ' + text.name);
-        inmemorydata.push({ts:Date.now(),name:text.name,value:text.value});
-        inmemoryqty++;
-        inmemorylastdata[text.name]=text.value;
-        if (inmemoryqty>100 && btGoogleSheetAPI!=='' ) {
-            purgeToFile(inmemorydata);
-            inmemorydata=[];
-            inmemoryqty=0;
-        }
+        pdata = {ts:Date.now(),name:text.name,value:text.value};
+        console.log(JSON.stringify(pdata));
+        inmemorydata.push(pdata);
+
+        db.executeSql('INSERT INTO livemetricstable VALUES (?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value], function(rs) {
+          }, function(error) {
+            console.log('Transaction ERROR: ' + error.message);
+          });
+
     }
-};
-
-var purgeToFile = function(arrdata) {
-    window.resolveLocalFileSystemURL(cordova.file.dataDirectory, function(dir) {
-        dir.getFile('tmpdata'+Date.now()+'.txt', {create:true}, function(file) {
-            file.createWriter(function(fileWriter) {
-                fileWriter.seek(fileWriter.length);
-
-                var blob = new Blob([JSON.stringify(arrdata)], {type:'text/plain'});
-                fileWriter.write(blob);
-                pushGlobalLog("Saved to file ");
-            }, function(){
-                console.log('Cannot write to file');
-                });
-        });
-    });
 };
 
 var btWrite = function(message, replies) {
@@ -604,7 +564,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                 return e.id;
             }).indexOf(id)].name;
             var connectInterval = $interval(function () {
-                    $scope.livestats.connectionstatus=' (Connecting to ' + devname + ' (' + ($scope.connectRetry) +')';
+                    $scope.livestats.connectionstatus=' Connecting to ' + devname + ' (' + ($scope.connectRetry) +')';
                     btConnectToDevice(id,function(result) {
                         $scope.connectRetry++;
                         if ($scope.connectRetry<-1){ //repeat indefinitely
@@ -636,7 +596,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     };
 
     $scope.uploadData = function() {
-        tryToUploadFile();
+        tryToUploadData();
     };
 
     $state.go('index');
