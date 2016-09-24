@@ -214,7 +214,6 @@ var btConnectToDevice = function (id,callback) {
 var btLastReceivedData = '';
 
 var inmemoryqty=0;
-var inmemorydata=[];
 var inmemorylastdata=[];
 
 //===========================================================================
@@ -228,7 +227,7 @@ var btEventEmit = function (event,text) {
         pushGlobalLog('New metric for ' + text.name);
         pdata = {ts:Date.now(),name:text.name,value:text.value};
         console.log(JSON.stringify(pdata));
-        inmemorydata.push(pdata);
+        inmemorylastdata[text.name]=text.value;
 
         db.executeSql('INSERT INTO livemetricstable VALUES (?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value], function(rs) {
           }, function(error) {
@@ -506,10 +505,12 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.selectDefaultMetrics = function() {
         for (var k = 0; k<$scope.metrics.length;k++){
             if ($scope.metrics[k].isDefault === true && $scope.metrics[k].metricSelectedToPoll===false ){
+                $scope.metricToPollClick($scope.metrics[k].name,true);
                 $scope.metrics[k].metricSelectedToPoll=true;
             }
             if ($scope.metrics[k].isDefault === false && $scope.metrics[k].metricSelectedToPoll===true ){
                 $scope.metrics[k].metricSelectedToPoll=false;
+                $scope.metricToPollClick($scope.metrics[k].name,false);
             }
         }
     };
@@ -561,12 +562,12 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             }
             $scope.btdevices = tmpdev;
 
+            fetchDefaultMetrics();
             var id = globalvars.getBtDeviceToUse();
-            if (id === undefined || id === '') {
+            if (id === undefined || id === '' || $scope.livemetrics.length < 1) {
                 $state.go('configuration');
                 return;
             }
-            fetchDefaultMetrics();
             console.log(id);
             //console.log($scope.btdevices);
             var devname = $scope.btdevices.devices[$scope.btdevices.devices.map(function(e)
@@ -617,6 +618,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
   $stateProvider
     .state('index', {
       url: "/index",
+      cache:false,
       views: {
         'menuContent' :{
             templateUrl: "index.html"
