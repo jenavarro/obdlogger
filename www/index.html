@@ -112,11 +112,11 @@
                     OBD Metrics
                 </div>
                 <div class="list list-inset">
-                    <div class="item">
+                    <div class="item item-text-wrap">
                         <div class="row" ng-repeat="metric in livemetrics">
-                            <div class="col col-50">{{metric.description}}</div>
-                            <div class="col col-25">{{metric.value | number : fractionSize}}</div>
-                            <div class="col col-25">{{metric.unit}}</div>
+                            <div class="col col-60">{{metric.description}}</div>
+                            <div class="col col-20"><span class="item-note"><strong>{{metric.value | number : fractionSize}}</strong></span></div>
+                            <div class="col col-20">{{metric.unit}}</div>
                         </div>
                     </div>
                 </div>
