@@ -483,6 +483,8 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.btGoogleSheetAPI='';
     $scope.logentries = [];
     $scope.logGPSLocation;
+
+    var logGPSInterval;
     var pollinginterval;
     
     var disconnectEverything = function () {
@@ -591,7 +593,6 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     
     
     var enableDisableNonOBDLogging = function(metric) {
-     var logGPSInterval;
      if (metric==='GPS' || metric===undefined){
          if ($scope.logGPSLocation){
              logGPSInterval = $interval(function () {
@@ -681,6 +682,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                             enableDisableNonOBDLogging();
                     } else {
                         $scope.livestats.connectionstatus='Connect to ' + devname + ' failed';
+                        $interval.cancel(logGPSInterval);
                       }});
             }, 10000);
         });
