@@ -109,7 +109,7 @@
                     </div>
                 </div>
                 <div class="item item-divider">
-                    Metrics
+                    OBD Metrics
                 </div>
                 <div class="list list-inset">
                     <div class="item">
@@ -129,14 +129,24 @@
 
                 <div class="list">
                     <div class="item item-divider">
-                        <i class="icon ion-bluetooth"></i> Select Bluetooth Device to Use
+                        Options
                     </div>
                     <label class="item item-input item-select">
                         <div class="input-label">
-                            Devices
-                        </div>
+                            <i class="icon ion-bluetooth"></i> Bluetooth Device</div>
                         <select ng-model="btdevices.selectedvalue" ng-options="device.name for device in btdevices.devices " ng-change="changebtdevice(btdevices.selectedvalue.id)">
                         </select>
+                    </label>
+                    <label class="item item-input item-toggle">
+                        <div class="input-label">
+                            <i class="icon ion-location"></i> Log GPS Location
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" ng-model="logGPSLocation" ng-change="logGPSLocationClick()">
+                            <div class="track">
+                                <div class="handle"></div>
+                            </div>
+                        </label>
                     </label>
                 </div>
                 <div class="list">
@@ -149,10 +159,13 @@
                     <button class="button button-block" ng-click="uploadData()">
                         Upload data manually
                     </button>
+                    <button class="button button-block" ng-click="clearCachedData()">
+                        Clear cached data
+                    </button>                    
                 </div>
 
                 <div class="item item-divider">
-                    <i class="icon ion-bluetooth"></i> Metrics to Poll
+                    <i class="icon ion-bluetooth"></i> OBD Metrics to Poll
                 </div>
                 <button class="button button-block" ng-click="selectDefaultMetrics()">
                     Select default metrics

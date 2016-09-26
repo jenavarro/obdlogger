@@ -22,6 +22,7 @@ var bluetoothSerial;
 var db = null;
 var flag_uploading = false;
 
+
 function onAppReady() {
     if( navigator.splashscreen && navigator.splashscreen.hide ) {   // Cordova API detected
         navigator.splashscreen.hide() ;
@@ -49,7 +50,14 @@ var btGoogleSheetAPI ='';
 
 var globalLog =[];
 var globalLogEnabled = true;   // disable when generating a build
+var btIntervalWriter;
 
+var clearDB = function() {
+    db.executeSql('DROP TABLE livemetricstable', [], function(res){
+        setupdb();
+    },function(err) {});
+
+}
 var pushGlobalLog = function(entry) {
     if (!globalLogEnabled) return;
 
@@ -272,31 +280,32 @@ var init_communication = function() {
     btEventEmit('connected','');
     btConnected=true;
 };
-
-var btIntervalWriter = setInterval(function () {
-                if (queue.length > 0 && btConnected)
-                    try {
-                        var writedata = queue.shift();
-                        bluetoothSerial.write(writedata + '\r',
-                                              function(success){btEventEmit('wrote data ' , writedata);
-                                                                          },
-                                              function (err) {
-                                btEventEmit('error', err);
-                        });
-                    } catch (err) {
-                        btEventEmit('error', 'Error while writing: ' + err);
-                        btEventEmit('error', 'OBD-II Listeners deactivated, connection is probably lost.');
-                        clearInterval(btIntervalWriter);
-                        removeAllPollers();
-                    }
-            }, writeDelay); //Updated with Adaptive Timing on ELM327. 20 queries a second seems good enough.
+var enableIntervalWriter = function() {
+    btIntervalWriter = setInterval(function () {
+                    if (queue.length > 0 && btConnected)
+                        try {
+                            var writedata = queue.shift();
+                            bluetoothSerial.write(writedata + '\r',
+                                                  function(success){btEventEmit('wrote data ' , writedata);
+                                                                              },
+                                                  function (err) {
+                                    btEventEmit('error', err);
+                            });
+                        } catch (err) {
+                            btEventEmit('error', 'Error while writing: ' + err);
+                            btEventEmit('error', 'OBD-II Listeners deactivated, connection is probably lost.');
+                            clearInterval(btIntervalWriter);
+                            removeAllPollers();
+                        }
+                }, writeDelay); //Updated with Adaptive Timing on ELM327. 20 queries a second seems good enough.
+};
 
 
 var btDisconnect = function () {
             clearInterval(btIntervalWriter);
             queue.length = 0; //Clears queue
             btConnected = false;
-            bluetoothSerial.close();
+            bluetoothSerial.disconnect();
         };
 
 var requestValueByName = function (name) {
@@ -347,6 +356,7 @@ var startPolling = function (interval) {
     pollerInterval = setInterval(function () {
         writePollers();
     }, interval);
+    enableIntervalWriter();
 };
 
 var stopPolling = function () {
@@ -418,7 +428,8 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     var btdevicetouse = '';
     var btGoogleSheetAPI = '';
     var btSelectedMetrics=[];
-
+    var logGPSLocation=true;
+    
     if ($localStorage.btdevicetouse!==undefined){
         if ($localStorage.btdevicetouse!==''){
             btdevicetouse = $localStorage.btdevicetouse;
@@ -430,6 +441,9 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     if ($localStorage.btGoogleSheetAPI!==undefined){
             btGoogleSheetAPI = $localStorage.btGoogleSheetAPI;
     }
+    if ($localStorage.logGPSLocation!==undefined){
+            logGPSLocation = $localStorage.logGPSLocation;
+    }    
     return {
         getSelectedMetrics: function() {return btSelectedMetrics;},
         setSelectedMetrics: function(pbtSelectedMetrics) {
@@ -446,7 +460,12 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         setGoogleSheetAPI: function(pbtGoogleSheetAPI) {
                     btGoogleSheetAPI=pbtGoogleSheetAPI;
                     $localStorage.btGoogleSheetAPI=pbtGoogleSheetAPI;
-                    }
+                    },
+        getLogGPSLocation: function() {return logGPSLocation;},
+        setLogGPSLocation: function(plogGPSLocation) {
+                    logGPSLocation=plogGPSLocation;
+                    $localStorage.logGPSLocation=plogGPSLocation;
+                    }        
     };
 })
  .controller('MainCtrl', function($scope,$http,$state,globalvars,$resource,$stateParams,$window,$interval) {
@@ -455,7 +474,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             navigator.splashscreen.hide();
         }
       });
-    $scope.livestats={connectionstatus:'Initializing...'};
+    $scope.livestats={connectionstatus:''};
     $scope.receiveddata ='';
     $scope.btdevices = {};
     $scope.metrics = [];
@@ -463,10 +482,16 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.connectRetry = 0;
     $scope.btGoogleSheetAPI='';
     $scope.logentries = [];
-
-    var disableIntervals = function () {
-
+    $scope.logGPSLocation;
+    var pollinginterval;
+    
+    var disconnectEverything = function () {
+        stopPolling();
+        removeAllPollers();
+        btDisconnect();
+        $scope.livestats={connectionstatus:''};
     };
+    
     var fetchDefaultMetrics = function() {
         var tmpmetrics=[];
         var selecteditems=[];
@@ -503,6 +528,8 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     };
 
     $scope.selectDefaultMetrics = function() {
+        var cfg = globalvars.getSelectedMetrics();
+        var i;
         for (var k = 0; k<$scope.metrics.length;k++){
             if ($scope.metrics[k].isDefault === true && $scope.metrics[k].metricSelectedToPoll===false ){
                 $scope.metricToPollClick($scope.metrics[k].name,true);
@@ -522,20 +549,67 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         if (value===true && i===-1){
             cfg.push(name);
             globalvars.setSelectedMetrics(cfg);
+            //stopPolling();
+            //addPoller(name);
+            //startPolling(pollinginterval);
+            fetchDefaultMetrics();
+            disconnectEverything();
+            console.log('Adding poller for ' + name);
         }
 
         // metric was un-selected but was in the savd config, shall be removed
         if (value===false && i>-1){
             cfg.splice(i,1);
             globalvars.setSelectedMetrics(cfg);
+            console.log('Removing poller for ' + name);
+            //stopPolling();
+            //removePoller(name);
+            //startPolling(pollinginterval);
+            fetchDefaultMetrics();            
+            disconnectEverything();
         }
     };
 
     $scope.changebtdevice = function(id){
-        if (id!=='' && id !== globalvars.getBtDeviceToUse())
-        globalvars.setBtDeviceToUse(id);
+        if (id!=='' && id !== globalvars.getBtDeviceToUse()){
+            globalvars.setBtDeviceToUse(id);
+            disconnectEverything();
+        }
     };
+    
+    function onGPSSuccess(position) {
+        var objdata={name:'location', 
+                     value:JSON.stringify({coords:{latitude:position.coords.latitude,longitude:position.coords.longitude}})
+                    };
+        btEventEmit ('dataReceived',objdata);
+    }
 
+    function onGPSError(error) {
+        pushGlobalLog('Cannot get GPS location: '    + error.code    + ' ' +
+              ' ' + error.message);
+    }
+    
+    
+    var enableDisableNonOBDLogging = function(metric) {
+     var logGPSInterval;
+     if (metric==='GPS' || metric===undefined){
+         if ($scope.logGPSLocation){
+             logGPSInterval = $interval(function () {
+              navigator.geolocation.getCurrentPosition(onGPSSuccess, onGPSError);
+             },10000);
+         } else {
+             $interval.cancel(logGPSInterval);
+         }
+     }
+    };
+    
+    $scope.logGPSLocationClick = function() {
+        $scope.logGPSLocation = !$scope.logGPSLocation;
+        globalvars.setLogGPSLocation($scope.logGPSLocation);
+        enableDisableNonOBDLogging('GPS');
+    }
+    
+    
     $scope.ShowSettings = function (){
         btShowSettings(function(result) {
             console.log(result);
@@ -547,9 +621,13 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         }
     };
     $scope.verifyConfigData = function () {
+        if (btConnected) return;
+        
+        $scope.livestats={connectionstatus:'Initializing...'};
         $scope.btGoogleSheetAPI = globalvars.getGoogleSheetAPI();
         btGoogleSheetAPI= $scope.btGoogleSheetAPI;
-
+        $scope.logGPSLocation = globalvars.getLogGPSLocation();
+        
         btGetDevices(function(results){
             //Fetch list of bluetooth devices
             var tmpdev = {devices:results,
@@ -575,6 +653,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                 return e.id;
             }).indexOf(id)].name;
             var connectInterval = $interval(function () {
+                    var totalmetrics=0;
                     $scope.livestats.connectionstatus=' Connecting to ' + devname + ' (' + ($scope.connectRetry) +')';
                     btConnectToDevice(id,function(result) {
                         $scope.connectRetry++;
@@ -588,13 +667,18 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                             for (var i=0; i<$scope.metrics.length;i++){
                                 if ($scope.metrics[i].metricSelectedToPoll===true){
                                     addPoller($scope.metrics[i].name);
+                                    totalmetrics++;
+                                    console.log('Adding poller for ' + $scope.metrics[i].name);
                                 }
                             }
-                            startPolling(5000);
-
+                            pollinginterval = totalmetrics * 50 * 4;
+                            if (pollinginterval<4000) pollinginterval=4000;
+                            startPolling(pollinginterval);
+                            
                             var pollerInterval = $interval(function () {
                                 queryLastData();
-                            }, 1000);
+                            }, 400);
+                            enableDisableNonOBDLogging();
                     } else {
                         $scope.livestats.connectionstatus='Connect to ' + devname + ' failed';
                       }});
@@ -605,7 +689,10 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.changebtGoogleSheetAPI = function(btGoogleSheetAPI){
         globalvars.setGoogleSheetAPI(btGoogleSheetAPI);
     };
-
+    $scope.clearCachedData = function() {
+        clearDB();
+    }
+        
     $scope.uploadData = function() {
         tryToUploadData();
     };
