@@ -370,8 +370,8 @@ PIDS = [
     {mode: modeRealTime, pid: "5F", bytes: 1, name: "emmissionreq", description: "Emission requirements to which vehicle is designed", min: 0, max: 0, unit: "Bit Encoded", convertToUseful: bitDecoder, isDefault:false},
 
     //added some new pid entries
-    {mode: modeRealTime, pid: "62", bytes: 1, name: "aet",          description: "Actual engine - percent torque", min: -125, max: 125, unit: "%", convertToUseful: convertEngineTorque, isDefault:true},
-    {mode: modeRealTime, pid: "67", bytes: 3, name: "ect",          description: "Engine coolant temperature", min: -40, max: 215, unit: "°C", isDefault:true},
+    {mode: modeRealTime, pid: "62", bytes: 1, name: "aet",          description: "Actual engine - percent torque", min: -125, max: 125, unit: "%", convertToUseful: convertEngineTorque, isDefault:false},
+    {mode: modeRealTime, pid: "67", bytes: 3, name: "ect",          description: "Engine coolant temperature", min: -40, max: 215, unit: "°C", isDefault:false},
     {mode: modeRealTime, pid: "6B", bytes: 5, name: "egrt",         description: "Exhaust gas recirculation temperature", min: -40, max: 215, unit: "°C", isDefault:false},
     {mode: modeRealTime, pid: "6D", bytes: 6, name: "fpc",          description: "Fuel pressure control system", min: -40, max: 215, unit: "°C", isDefault:false},
     {mode: modeRealTime, pid: "6E", bytes: 5, name: "ipct",         description: "Injection pressure control system", min: -40, max: 215, unit: "°C", isDefault:false},

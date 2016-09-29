@@ -32,6 +32,11 @@ function onAppReady() {
         setupdb();
 
     }
+
+    document.addEventListener("backbutton", onBackKeyDown, false);
+        function onBackKeyDown(e) {
+          e.preventDefault();
+        }
 }
 
 var setupdb = function(){
@@ -426,7 +431,7 @@ var parseOBDCommand = function (hexString) {
 angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-loading-bar','angular-inview','ngStorage'])
  .factory('globalvars', function($localStorage) {
     var btdevicetouse = '';
-    var btGoogleSheetAPI = '';
+    var lbtGoogleSheetAPI = '';
     var btSelectedMetrics=[];
     var logGPSLocation=true;
     
@@ -439,7 +444,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             btSelectedMetrics = JSON.parse($localStorage.btSelectedMetrics);
     }
     if ($localStorage.btGoogleSheetAPI!==undefined){
-            btGoogleSheetAPI = $localStorage.btGoogleSheetAPI;
+            lbtGoogleSheetAPI = $localStorage.btGoogleSheetAPI;
     }
     if ($localStorage.logGPSLocation!==undefined){
             logGPSLocation = $localStorage.logGPSLocation;
@@ -456,9 +461,9 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     $localStorage.btdevicetouse=btdevicetouse;
                     console.log('saving to localstorage key=btdevicetouse');
                     },
-        getGoogleSheetAPI: function() {return btGoogleSheetAPI;},
+        getGoogleSheetAPI: function() {return lbtGoogleSheetAPI;},
         setGoogleSheetAPI: function(pbtGoogleSheetAPI) {
-                    btGoogleSheetAPI=pbtGoogleSheetAPI;
+                    lbtGoogleSheetAPI=pbtGoogleSheetAPI;
                     $localStorage.btGoogleSheetAPI=pbtGoogleSheetAPI;
                     },
         getLogGPSLocation: function() {return logGPSLocation;},
@@ -600,6 +605,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
              },10000);
          } else {
              $interval.cancel(logGPSInterval);
+             window.plugins.insomnia.allowSleepAgain();
          }
      }
     };
@@ -665,6 +671,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                             $scope.connectRetry=0;
                             $interval.cancel(connectInterval);
                             $scope.livestats.connectionstatus='Connected to ' + devname;
+                            window.plugins.insomnia.keepAwake();
                             for (var i=0; i<$scope.metrics.length;i++){
                                 if ($scope.metrics[i].metricSelectedToPoll===true){
                                     addPoller($scope.metrics[i].name);
@@ -683,13 +690,15 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     } else {
                         $scope.livestats.connectionstatus='Connect to ' + devname + ' failed';
                         $interval.cancel(logGPSInterval);
+                        window.plugins.insomnia.allowSleepAgain();
                       }});
             }, 10000);
         });
     };
 
-    $scope.changebtGoogleSheetAPI = function(btGoogleSheetAPI){
-        globalvars.setGoogleSheetAPI(btGoogleSheetAPI);
+    $scope.changebtGoogleSheetAPI = function(pbtGoogleSheetAPI){
+        globalvars.setGoogleSheetAPI(pbtGoogleSheetAPI);
+        btGoogleSheetAPI= pbtGoogleSheetAPI;
     };
     $scope.clearCachedData = function() {
         clearDB();
