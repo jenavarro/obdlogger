@@ -15,7 +15,7 @@
  * Author: Javier Navarro
  */
 
-/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer,callback,modeRealTime */
+/*global token,ionic,clearInterval,app,console, window,cordova,FileReader,async,XMLHttpRequest,alert,Connection,Blob, setinterval,navigator,angular,document,setInterval,PIDS,Buffer,callback,modeRealTime,thisTrip */
 "use strict";
 
 var bluetoothSerial;
@@ -44,7 +44,8 @@ var setupdb = function(){
     //CREATE TABLE IF NOT EXISTS
 
         //db.executeSql('DROP TABLE livemetricstable', [], function(res){},function(err) {});
-        db.executeSql('CREATE TABLE IF NOT EXISTS livemetricstable (rowid INTEGER PRIMARY KEY,ts INT, name text, value text)');
+        db.executeSql('CREATE TABLE IF NOT EXISTS livemetricstable (rowid INTEGER PRIMARY KEY,ts INT, name text, value text, tripId INT)');
+        db.executeSql('CREATE TABLE IF NOT EXISTS trips (startedTs INTEGER PRIMARY KEY, duration INT)');
 
 };
 
@@ -58,11 +59,10 @@ var globalLogEnabled = true;   // disable when generating a build
 var btIntervalWriter;
 
 var clearDB = function() {
-    db.executeSql('DROP TABLE livemetricstable', [], function(res){
-        setupdb();
-    },function(err) {});
+    db.executeSql('DELETE FROM livemetricstable', [], function(res){},function(err) {});
+    db.executeSql('DELETE FROM TRIPS ', [], function(res){},function(err) {});
 
-}
+};
 var pushGlobalLog = function(entry) {
     if (!globalLogEnabled) return;
 
@@ -218,6 +218,7 @@ var btConnectToDevice = function (id,callback) {
                     },
                     function() {
                         console.log("NOT connected to " + id);
+                        thisTrip.setFinished();
                         btConnected = false;
                         callback(false);
                     }
@@ -242,7 +243,7 @@ var btEventEmit = function (event,text) {
         console.log(JSON.stringify(pdata));
         inmemorylastdata[text.name]=text.value;
 
-        db.executeSql('INSERT INTO livemetricstable VALUES (?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value], function(rs) {
+        db.executeSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value, thisTrip.tripId()], function(rs) {
           }, function(error) {
             console.log('Transaction ERROR: ' + error.message);
           });
@@ -487,11 +488,33 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.connectRetry = 0;
     $scope.btGoogleSheetAPI='';
     $scope.logentries = [];
-    $scope.logGPSLocation;
-
+    $scope.logGPSLocation=false;
+    $scope.trips=[];
+    $scope.elapsed = '';
     var logGPSInterval;
     var pollinginterval;
     
+    $scope.readTrips = function() {
+        var tmpdate = new Date();
+        thisTrip.getTrips().then(function(res) {
+            if (!res) {
+                $scope.trips = [];
+                return;
+            }
+            var tmptrips =[];
+            console.log('Row count from SELECT: ' + res.rows.length);
+            for (var i = 0; i < res.rows.length; i++)
+            {
+                tmpdate = new Date(res.rows.item(i).startedTs);
+                tmptrips.push({
+                    tripstarted:tmpdate,
+                    tripduration:Math.abs( res.rows.item(i).duration/60)
+                });
+            }
+            $scope.trips=tmptrips;
+
+        });
+    };
     var disconnectEverything = function () {
         stopPolling();
         removeAllPollers();
@@ -614,7 +637,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         $scope.logGPSLocation = !$scope.logGPSLocation;
         globalvars.setLogGPSLocation($scope.logGPSLocation);
         enableDisableNonOBDLogging('GPS');
-    }
+    };
     
     
     $scope.ShowSettings = function (){
@@ -625,6 +648,12 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     var queryLastData = function() {
         for (var k=0;k<$scope.livemetrics.length;k++){
             $scope.livemetrics[k].value = inmemorylastdata[$scope.livemetrics[k].name];
+        }
+        var elapsed = thisTrip.getElapsed();
+        if (elapsed>59){
+            $scope.elapsed = 'Trip: ' + Math.trunc(thisTrip.getElapsed()/60) + ' min';
+        }else {
+            $scope.elapsed = 'Trip: ' + Math.trunc(thisTrip.getElapsed()) + ' sec';
         }
     };
     $scope.verifyConfigData = function () {
@@ -670,6 +699,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                         if (result){
                             $scope.connectRetry=0;
                             $interval.cancel(connectInterval);
+                            thisTrip.setStarted();
                             $scope.livestats.connectionstatus='Connected to ' + devname;
                             window.plugins.insomnia.keepAwake();
                             for (var i=0; i<$scope.metrics.length;i++){
@@ -690,6 +720,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     } else {
                         $scope.livestats.connectionstatus='Connect to ' + devname + ' failed';
                         $interval.cancel(logGPSInterval);
+                        thisTrip.setFinished();
                         window.plugins.insomnia.allowSleepAgain();
                       }});
             }, 10000);
@@ -702,7 +733,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     };
     $scope.clearCachedData = function() {
         clearDB();
-    }
+    };
         
     $scope.uploadData = function() {
         tryToUploadData();
@@ -740,6 +771,16 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
       views: {
         'menuContent' : {
           templateUrl: "settings.html"
+        }
+      }
+    });
+  $stateProvider
+    .state('trips', {
+      url: "/trips.html",
+      cache:false,
+      views: {
+        'menuContent' : {
+          templateUrl: "trips.html"
         }
       }
     });
