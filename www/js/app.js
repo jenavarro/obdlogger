@@ -508,7 +508,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                 tmpdate = new Date(res.rows.item(i).startedTs);
                 tmptrips.push({
                     tripstarted:tmpdate,
-                    tripduration:Math.abs( res.rows.item(i).duration/60)
+                    tripduration:Math.ceil( res.rows.item(i).duration/60)
                 });
             }
             $scope.trips=tmptrips;

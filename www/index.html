@@ -233,8 +233,17 @@
 
                 <div class="list list-inset" ng-init="readTrips()">
                     <div class="item" ng-repeat="trip in trips">
-                        Started {{trip.tripstarted | date:'dd/MM/yyyy HH:mm'}} Duration {{trip.tripduration}} min.
+                        <!--Trip {{trip.tripstarted | date:'dd/MM/yy HH:mm'}} Dur. {{trip.tripduration}} min(s). -->
+                        <div class="row">
+                            <div class="col col-70">Trip {{trip.tripstarted | date:'dd/MM/yy HH:mm'}}</div>
+                            <div class="col col-30">{{trip.tripduration}} min(s).</div>
+
+                        </div>
                     </div>
+
+
+
+
                 </div>
 
 
