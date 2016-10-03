@@ -38,7 +38,7 @@
     <link href="css/ionicons.min.css" rel="stylesheet">
     <link href="css/loading-bar.min.css" rel="stylesheet">
     <link href="css/app.css" rel="stylesheet">
-
+    <script type="text/javascript" src="js/tripparsing.js"></script>
     <script type="text/javascript" src="bluetoothSerial.js"></script>
     <script src="lib/ionicframework/ionic.bundle.min.js"></script>
     <script src="lib/ionicframework/ngStorage.min.js"></script>
@@ -76,6 +76,9 @@
                     <a ui-sref="index" class="item" menu-close>Live Data</a>
                 </ul>
                 <ul class="list">
+                    <a ui-sref="trips" class="item" menu-close>Trips</a>
+                </ul>
+                <ul class="list">
                     <a ui-sref="configuration" class="item" menu-close>Configuration</a>
                 </ul>
                 <ul class="list">
@@ -104,7 +107,8 @@
                 <div class="list list-inset" ng-init="verifyConfigData()">
                     <div class="item">
                         <div class="row">
-                            <div class="col col-50">{{livestats.connectionstatus}}</div>
+                            <div class="col col-70">{{livestats.connectionstatus}}</div>
+                            <div class="col col-30">{{elapsed}}</div>
                         </div>
                     </div>
                 </div>
@@ -218,6 +222,22 @@
                     <li ng-repeat="logentry in logentries track by $index">
                         {{logentry}}</li>
                 </ul>
+
+
+            </ion-content>
+        </ion-view>
+    </script>
+    <script id="trips.html" type="text/ng-template">
+        <ion-view view-title="Trips">
+            <ion-content class="padding">
+
+                <div class="list list-inset" ng-init="readTrips()">
+                    <div class="item" ng-repeat="trip in trips">
+                        Started {{trip.tripstarted | date:'dd/MM/yyyy HH:mm'}} Duration {{trip.tripduration}} min.
+                    </div>
+                </div>
+
+
 
 
             </ion-content>
