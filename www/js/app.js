@@ -57,6 +57,7 @@ var btGoogleSheetAPI ='';
 var globalLog =[];
 var globalLogEnabled = true;   // disable when generating a build
 var btIntervalWriter;
+var intervalLogGeoLocation;
 
 var clearDB = function() {
     db.executeSql('DELETE FROM livemetricstable', [], function(res){},function(err) {});
@@ -64,12 +65,13 @@ var clearDB = function() {
 
 };
 var pushGlobalLog = function(entry) {
+    var d = new Date();
     if (!globalLogEnabled) return;
 
     if (globalLog.length>99) {
         globalLog = globalLog.splice(0,1);
     }
-    globalLog.push(entry);
+    globalLog.push(d.toLocaleString() + ' ' + entry);
 };
 
 var tryToUploadData = function() {
@@ -423,13 +425,35 @@ var parseOBDCommand = function (hexString) {
             }
             return reply;
         };
+// Logging Geo Location
 
+function onGPSSuccess(position) {
+    var objdata={name:'location',
+                 value:JSON.stringify({coords:{latitude:position.coords.latitude,longitude:position.coords.longitude}})
+                };
+    btEventEmit ('dataReceived',objdata);
+}
+
+function onGPSError(error) {
+    pushGlobalLog('Cannot get GPS location: '    + error.code    + ' ' +
+          ' ' + error.message);
+}
+var startLoggingGeoLocation = function(){
+    intervalLogGeoLocation =
+        navigator.geolocation.watchPosition(onGPSSuccess, onGPSError, { frequency: 15000, enableHighAccuracy: true });
+
+
+}
+
+var stopLoggingGeoLocation = function() {
+    navigator.geolocation.clearWatch(intervalLogGeoLocation);
+}
 
 /*
 ==========================================================================
 */
 
-angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-loading-bar','angular-inview','ngStorage'])
+angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-loading-bar','angular-inview','ngStorage','ngCordova'])
  .factory('globalvars', function($localStorage) {
     var btdevicetouse = '';
     var lbtGoogleSheetAPI = '';
@@ -474,7 +498,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                     }        
     };
 })
- .controller('MainCtrl', function($scope,$http,$state,globalvars,$resource,$stateParams,$window,$interval) {
+ .controller('MainCtrl', function($scope,$http,$state,globalvars,$resource,$stateParams,$window,$interval,$cordovaGeolocation) {
     ionic.Platform.ready(function() {
         if (navigator.splashscreen !== undefined) {
             navigator.splashscreen.hide();
@@ -491,6 +515,18 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
     $scope.logGPSLocation=false;
     $scope.trips=[];
     $scope.elapsed = '';
+    $scope.thistripdetails = {
+        tsStart:''  ,
+        tsEnd:'',
+        fuelStart:0,
+        fuelEnd:0,
+        fuelConsumption:0,
+        fuelCost:0,
+        distance:0,
+        maxSpeed:0,
+        maxRPM:0
+    };
+
     var logGPSInterval;
     var pollinginterval;
     
@@ -508,6 +544,7 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
                 tmpdate = new Date(res.rows.item(i).startedTs);
                 tmptrips.push({
                     tripstarted:tmpdate,
+                    tripstartedTs:res.rows.item(i).startedTs,
                     tripduration:Math.ceil( res.rows.item(i).duration/60)
                 });
             }
@@ -515,6 +552,128 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
 
         });
     };
+
+    $scope.readTripDetails = function() {
+        var options = {timeout: 10000, enableHighAccuracy: true};
+        var drawMap = function(coordinates) {
+            var i;
+            var polygonCoords=[];
+            /*coordinates = [
+                {"coords":{"latitude":-31.3640702,"longitude":-64.3452619}},
+                {"coords":{"latitude":-31.3640363,"longitude":-64.345183}},
+                {"coords":{"latitude":-31.3640401,"longitude":-64.3451807}},
+                {"coords":{"latitude":-31.3621943,"longitude":-64.3392046}}
+            ];*/
+
+            var flightPlanCoordinates = [];
+            for (var k=0;k<coordinates.length;k++){
+                flightPlanCoordinates.push({
+                    lat: coordinates[k].coords.latitude,
+                    lng: coordinates[k].coords.longitude,
+                });
+                // to calculate the center
+                polygonCoords.push(
+                  new google.maps.LatLng(coordinates[k].coords.latitude, coordinates[k].coords.longitude));
+            };
+
+            var bounds = new google.maps.LatLngBounds();
+            for (i = 0; i < polygonCoords.length; i++) {
+              bounds.extend(polygonCoords[i]);
+            }
+
+            var map = new google.maps.Map(document.getElementById('map'), {
+              zoom: 14,
+              center: bounds.getCenter(),
+              mapTypeId: 'terrain'
+            });
+
+
+            var flightPath = new google.maps.Polyline({
+              path: flightPlanCoordinates,
+              geodesic: true,
+              strokeColor: '#FF0000',
+              strokeOpacity: 1.0,
+              strokeWeight: 2
+            });
+
+            flightPath.setMap(map);
+        }
+
+        var tripdata =[];
+        db.executeSql('SELECT * FROM livemetricstable WHERE tripId = ? ORDER BY ts ASC', [$stateParams.tripstartedTs], function(res){
+            function isNumber (o) {
+              return ! isNaN (o-0) && o !== null && o !== "" && o !== false;
+            }
+            var fetchValue = function(field,direction,type){
+                if (direction==='F'){ //First
+                    for (var k =0;k<tripdata.length;k++){
+                        if (tripdata[k].name === field) {
+                            return tripdata[k].value;
+                        }
+                    }
+                }
+                if (direction==='L'){ //Last
+                    for (var k =tripdata.length-1;k>=0;k--){
+                        if (tripdata[k].name === field) {
+                            return tripdata[k].value;
+                        }
+                    }
+                }
+                if (direction==='M'){ //Max
+                    var maxval = undefined;
+                    for (var k =0;k<tripdata.length;k++){
+                        if (tripdata[k].name === field) {
+                            if (maxval === undefined && isNumber(tripdata[k].value) ) {
+                                maxval = Number(tripdata[k].value);
+                            }
+                            if (isNumber(maxval) && isNumber(tripdata[k].value) &&  Number(tripdata[k].value)>maxval) maxval = Number(tripdata[k].value);
+                        }
+                    }
+                    if (isNumber(maxval) ) {
+                        return maxval;
+                    }else{
+                        return '';
+                    }
+                }
+                if (direction==='A'){ //All values of that metric
+                    var tmpvalues = [];
+                    for (var k =0;k<tripdata.length;k++){
+                        if (tripdata[k].name === field) {
+                            if (type==='J') {//JSON
+                                tmpvalues.push(JSON.parse(tripdata[k].value));
+                            } else {
+                                tmpvalues.push(tripdata[k].value);
+                            }
+                        }
+                    }
+                    return tmpvalues;
+                }
+            return '';
+            }
+
+            console.log('Row count from trip data: ' + res.rows.length);
+            for (var i = 0; i < res.rows.length; i++)
+            {
+                tripdata.push({ts:res.rows.item(i).ts, name:res.rows.item(i).name, value:res.rows.item(i).value});
+            }
+
+        $scope.thistripdetails = {
+            tsStart:''  ,
+            tsEnd:'',
+            fuelStart:0,
+            fuelEnd:0,
+            fuelConsumption:0,
+            fuelCost:0,
+            distance:0,
+            maxSpeed:fetchValue('vss','M',''), // fetch maximum value of speed metric
+            maxRPM:fetchValue('rpm','M','')   // fetch maximum value of rpm metric
+        };
+        drawMap(fetchValue('location','A','J')); // fetch all location points
+        console.log($scope.thistripdetails);
+
+    });
+    };
+
     var disconnectEverything = function () {
         stopPolling();
         removeAllPollers();
@@ -606,28 +765,13 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
             disconnectEverything();
         }
     };
-    
-    function onGPSSuccess(position) {
-        var objdata={name:'location', 
-                     value:JSON.stringify({coords:{latitude:position.coords.latitude,longitude:position.coords.longitude}})
-                    };
-        btEventEmit ('dataReceived',objdata);
-    }
 
-    function onGPSError(error) {
-        pushGlobalLog('Cannot get GPS location: '    + error.code    + ' ' +
-              ' ' + error.message);
-    }
-    
-    
     var enableDisableNonOBDLogging = function(metric) {
      if (metric==='GPS' || metric===undefined){
          if ($scope.logGPSLocation){
-             logGPSInterval = $interval(function () {
-              navigator.geolocation.getCurrentPosition(onGPSSuccess, onGPSError);
-             },10000);
+             startLoggingGeoLocation();
          } else {
-             $interval.cancel(logGPSInterval);
+             stopLoggingGeoLocation();
              window.plugins.insomnia.allowSleepAgain();
          }
      }
@@ -794,5 +938,14 @@ angular.module('ionicApp', ['ionic','ngResource','ngAnimate','ngTouch','angular-
         }
       }
     });
-
+$stateProvider
+	.state('tripdetails', {
+		url: "/tripdetails/:tripstartedTs",
+        cache:false,
+        views: {
+            'menuContent' : {
+            templateUrl: "tripdetails.html"
+        }
+        }
+	});
 });

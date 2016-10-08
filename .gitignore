@@ -1,6 +1,7 @@
 # ignore Cordova/PhoneGap CLI directories
 # in essence, everything but *.xdk file and www directory
 /*
+/www/mapsinsert.html
 !/www
 !/docs
 !/config.xml

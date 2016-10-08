@@ -5,7 +5,7 @@
       "projectTypeName": "com.intel.xdk.projecttype.jsapp",
       "src": "jsapp/template-blank-cordova-project-lite/sample.zip",
       "projectGuid": "7ef9f3e2-776e-461b-8dda-963196affb89",
-      "lastModifiedDate": 1474597753837,
+      "lastModifiedDate": 1475935652734,
       "creationDate": 1464136862032
     },
     "XDK-app-designer": "false",
@@ -75,7 +75,8 @@
         "gitref": "",
         "name": "Splashscreen",
         "description": "Cordova Splashscreen Plugin",
-        "checksum": "47137083"
+        "checksum": "47137083",
+        "cordovaVersion": ">=3.0.0"
       },
       {
         "id": "cordova-plugin-bluetooth-serial",
@@ -145,7 +146,8 @@
         },
         "description": "Cordova Network Information Plugin",
         "data": {},
-        "dependedBy": []
+        "dependedBy": [],
+        "cordovaVersion": ">=3.0.0"
       },
       {
         "id": "cordova-plugin-compat",
@@ -213,6 +215,25 @@
         "description": "Native interface to SQLite for PhoneGap/Cordova. Allows you to use more storage and provides more flexibility than the standard Web SQL database (window.openDatabase).",
         "data": {},
         "dependedBy": []
+      },
+      {
+        "id": "cordova-plugin-insomnia",
+        "name": "Insomnia (prevent screen sleep)",
+        "version": "4.2.0",
+        "originType": "cordova.io",
+        "origin": "cordova-plugin-insomnia",
+        "gitref": "",
+        "paramvals": {},
+        "sourceLocation": "plugins/cordova-plugin-insomnia",
+        "selectedState": "Included",
+        "checksum": "81fb6e00",
+        "dependsOn": [],
+        "topLevel": true,
+        "cordovaVersion": ">=3.0.0",
+        "permissions": {},
+        "description": "\n    Prevent the screen of the mobile device from falling asleep.\n  ",
+        "data": {},
+        "dependedBy": []
       }
     ],
     "buildConfigurations": {
@@ -233,25 +254,19 @@
         "appAccess_": {
           "mode": "whitelist",
           "network": [
-            "https://script.googleusercontent.com",
-            "https://*.google.com",
-            "https://script.google.com"
+            "*"
           ],
           "intents": [
             "http://*/*",
             "https://*/*",
-            "tel:*",
-            "sms:*",
-            "mailto:*",
-            "geo:*",
-            "market:*"
+            "geo:*"
           ],
           "navigation": [],
           "properties": {}
         },
         "icons_": [],
         "splashes_": [],
-        "addlPermissions_": "",
+        "addlPermissions_": "ACCESS_FINE_LOCATION",
         "excludedLibraries_": "",
         "xwalkPkgId_": "",
         "xwalkAppVersion_": "",
