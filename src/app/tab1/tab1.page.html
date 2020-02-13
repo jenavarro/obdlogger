@@ -1,0 +1,42 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>
+      Live Data
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+<!-- 
+  status CONNECTED
+  metrics last minute
+  last uploaded to backend
+
+-->
+
+
+<ion-content>
+    <ion-card class="welcome-card">
+      <ion-card-header>
+        <ion-card-subtitle>OBD Logger</ion-card-subtitle>
+        <ion-card-title>Welcome to Ionic</ion-card-title>
+      </ion-card-header>
+ 
+    </ion-card>
+
+    <ion-list >
+
+    <ion-item>
+      <ion-icon slot="start"  name="pulse"></ion-icon >
+      <ion-label> {{connstatus}} </ion-label>
+      <ion-spinner *ngIf="btIsConnecting"></ion-spinner>
+    </ion-item>
+    <!--
+    <ion-item>
+      <ion-label> Metrics logged in DB </ion-label>
+      <ion-badge [(ngModel)]="liveStatsNumRecordsToSend" color="primary">{{liveStatsNumRecordsToSend}}</ion-badge>
+     </ion-item>
+     -->
+  </ion-list>
+ 
+
+
+</ion-content>
