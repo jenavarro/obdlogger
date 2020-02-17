@@ -1,0 +1,138 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>
+      Configuration
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+ 
+<ion-content fullscreen class="ion-padding">
+  <ion-list>
+    <ion-list-header>
+      OBD Device
+    </ion-list-header>
+  <ion-item>
+    <ion-icon  slot="start"   name="bluetooth"></ion-icon>
+      <!--<ion-label> {{defaultbluetoothdev}} </ion-label> -->
+      <ion-select [(ngModel)]="pairedDeviceID" [interfaceOptions]="customActionSheetOptions" interface="popover"  (ionChange)="selectBtDevice($event)" >
+        <ion-select-option *ngFor="let i of pairedList;let j=index" value="{{j}}" selected="{{i.isSelected}}">{{i.name}}/{{i.isSelected}}</ion-select-option>
+       </ion-select>
+  </ion-item>
+  <ion-item>
+    <ion-icon slot="start"  name="pulse"></ion-icon >
+    <ion-label> {{connstatus}} </ion-label>
+    <ion-spinner *ngIf="btIsConnecting"></ion-spinner>
+  </ion-item>
+     
+  <ion-item>
+    <ion-label> Metrics logged in DB </ion-label>
+    <ion-badge   color="primary">{{liveStatsNumRecordsToSend}}</ion-badge>
+   </ion-item>
+ 
+</ion-list>
+ 
+<ion-list>
+  <ion-list-header>
+    Logger Upload Service
+  </ion-list-header>
+
+  <p  >
+    <ion-chip   (click)="selectDataUpload('localserver')">
+      <ion-icon  name="checkmark-circle"  *ngIf="globalconfig.dataUpload.mode=='localserver'" ></ion-icon>
+      <ion-label>InfluxDB Server (HTTP)</ion-label>
+    </ion-chip>
+    <ion-chip  (click)="selectDataUpload('backend')" >
+      <ion-icon   name="checkmark-circle"   *ngIf="globalconfig.dataUpload.mode=='backend'" ></ion-icon>
+      <ion-label>Cloud </ion-label>
+    </ion-chip>
+    <ion-chip  (click)="this.selectDataUpload('csv')">
+      <ion-icon   name="checkmark-circle"    *ngIf="globalconfig.dataUpload.mode=='csv'" ></ion-icon>
+      <ion-label>CSV</ion-label>
+    </ion-chip>
+  </p>
+
+  <ion-item *ngIf="globalconfig.dataUpload.mode=='backend'">
+    <ion-label floating>Service API Key:</ion-label>
+    <ion-input type="text" name="apikey"  [(ngModel)]="globalconfig.dataUpload.apikey"  (ionChange)="this.configDataUpload()"></ion-input>
+  </ion-item>
+  <ion-item *ngIf="globalconfig.dataUpload.mode=='backend'">
+    <ion-label floating>Service API Secret:</ion-label>
+    <ion-input type="text" name="apisecret"  [(ngModel)]="globalconfig.dataUpload.apisecret"  (ionChange)="this.configDataUpload()"></ion-input>
+  </ion-item>
+  <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
+    <ion-label floating>Influx Server Host:</ion-label>
+    <ion-input type="url" inputmode="url" name="localserver"  [(ngModel)]="globalconfig.dataUpload.localserver"  (ionChange)="this.configDataUpload()"></ion-input>
+  </ion-item>  
+</ion-list>
+
+  <ion-list [(ngModel)]="obdmetrics" ngDefaultControl >
+    <ion-list-header>Metrics</ion-list-header>
+  
+    <ion-item *ngFor="let i of obdmetrics;let j=index" value="{{j}}" > 
+      <ion-label>{{i.description}}</ion-label>
+      <ion-toggle slot="end"   color="success" checked="{{i.metricSelectedToPoll}}" (ionChange)="saveMetricsCfg( )"></ion-toggle>
+    </ion-item>
+  </ion-list>
+  
+  <section>
+    <header> </header>
+    <ion-button (click)="resetMetrics()" expand="block"><ion-icon name="refresh"></ion-icon>Reset to Most Used Metrics</ion-button>
+    <ion-button (click)="dropDBTables()" expand="block"><ion-icon name="refresh"></ion-icon>Reset metrics DB</ion-button>
+  </section>
+ 
+</ion-content>
+  <!--
+  [compareWith]="compareWith"
+
+<ion-content padding>
+  <ion-list class="ion-padding"  >
+    <ion-list-header>
+      <ion-icon name="bluetooth"></ion-icon>&nbsp;
+        OBD Device
+    </ion-list-header>
+    <ion-item  > 
+      <ion-label>{{defaultbluetoothdev}}  </ion-label>
+
+        <ion-label> 
+          <button ion-button full class="submit-button" (click)="selectBluetoothDevice()">
+            <ion-icon  name="settings"></ion-icon> </button> </ion-label>
+
+
+     </ion-item>
+      
+
+  </ion-list>
+  
+<div id="bluetoothdevlist"*ngIf="showbluetoothconfig" >
+  <button ion-button full class="submit-button" (click)="listPairedDevices()">
+    <ion-icon name="refresh"></ion-icon>&nbsp;Refresh Bluetooth Devices</button>
+  <ion-row>
+    <ion-col>
+      <ion-list radio-group [(ngModel)]="pairedDeviceID" *ngIf="listToggle">
+        <ion-item *ngFor="let i of pairedList;let j=index">
+          <ion-label>{{i.name}}/{{i.isSelected}}/</ion-label>
+          <ion-radio value="{{j}}" checked="{{i.isSelected}}"></ion-radio>
+        </ion-item>
+      </ion-list>
+    </ion-col>
+  </ion-row>
+  <button ion-button full class="submit-button" *ngIf="listToggle" (click)="selectDevice()">
+    <ion-icon name="bluetooth"></ion-icon>&nbsp;Autoconnect Bluetooth Devices</button>
+  <ion-list>
+    <ion-item>
+      <ion-label floating>Type The Data You want to Send</ion-label>
+      <ion-input type="text" name="datasend" [(ngModel)]="dataSend"></ion-input>
+    </ion-item>
+  </ion-list>
+  <button ion-button full class="submit-button" (click)="sendData()">
+    <ion-icon name="send"></ion-icon>&nbsp;Send Data Via Bluetooth
+  </button> 
+</div>
+  <ion-list-header>
+    <ion-icon name="bluetooth"></ion-icon>&nbsp;
+      OBD Latest Data
+  </ion-list-header>
+  </ion-content>
+ 
+
+-->

@@ -1,0 +1,7 @@
+{
+  "name": "OBD Logger",
+  "integrations": {
+    "cordova": {}
+  },
+  "type": "angular"
+}
