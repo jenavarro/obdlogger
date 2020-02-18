@@ -68,7 +68,7 @@
   <ion-list [(ngModel)]="obdmetrics" ngDefaultControl >
     <ion-list-header>Metrics</ion-list-header>
   
-    <ion-item *ngFor="let i of obdmetrics;let j=index" value="{{j}}" > 
+    <ion-item *ngFor="let i of obdmetrics;let j=index" value="{{j}}"   > 
       <ion-label>{{i.description}}</ion-label>
       <ion-toggle slot="end"   color="success" checked="{{i.metricSelectedToPoll}}" (ionChange)="saveMetricsCfg( )"></ion-toggle>
     </ion-item>
@@ -78,6 +78,10 @@
     <header> </header>
     <ion-button (click)="resetMetrics()" expand="block"><ion-icon name="refresh"></ion-icon>Reset to Most Used Metrics</ion-button>
     <ion-button (click)="dropDBTables()" expand="block"><ion-icon name="refresh"></ion-icon>Reset metrics DB</ion-button>
+  <!--<p></p>
+  <ion-button (click)="fakedata()" expand="block"><ion-icon name="refresh"></ion-icon>Insert fake data</ion-button>
+  -->
+
   </section>
  
 </ion-content>

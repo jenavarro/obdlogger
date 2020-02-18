@@ -85,7 +85,7 @@ export class Tab2Page {
         this.checkBluetoothEnabled();
       }
       // Upload data if there is wifi
-      if ( !this.btConnected && this.isNetworkConnectivity ) {     //!this.btIsConnecting &&
+      if ( !this.btConnected && this.isNetworkConnectivity && this.liveStatsNumRecordsToSend >0 ) {     //!this.btIsConnecting &&
         if (this.uploadingData) {
           console.log('There\'wifi!, attempting to upload data but still uploading previous cycle, retrying in 20 seconds...');
           return;
@@ -160,7 +160,7 @@ export class Tab2Page {
 }
   
 loadGlobalConfig() {
-  
+
 this.cloudSettings.exists()
 .then((exists: boolean) => {
   console.log("Saved settings exist: " + exists) ;
@@ -562,6 +562,7 @@ saveMetricsCfg( ) {
  // Upload Data  -------------------------------------------------------------------------------------------------------
  
 getRecords = async function(db: SQLiteObject) {
+  console.log('Start Get Records...');
   return new Promise((resolve, reject) => {
     db.transaction(
           tx => {
@@ -588,8 +589,8 @@ sendRecords = async function(data):Promise<boolean> {
   let headers = {
     'Content-Type': 'application/json'
   };
-  if (this.dataUpload.mode==='localserver') {
-    url = 'http://' + this.dataUpload.localserver + '/write?db=obdmetrics&precision=ms'; 
+  if (this.globalconfig.dataUpload.mode==='localserver') {
+    url = 'http://' + this.globalconfig.dataUpload.localserver + '/write?db=obdmetrics&precision=ms'; 
     // Set HTTP POST InfluxDB format
     var datainfluxdb='';
     data.forEach(itm => {
@@ -598,7 +599,7 @@ sendRecords = async function(data):Promise<boolean> {
     data = datainfluxdb; 
     this.http.setDataSerializer('utf8');
   }
-  if (this.dataUpload.mode==='backend') {
+  if (this.globalconfig.dataUpload.mode==='backend') {
     url = 'https://qridr.com.ar/obdmetrics';
   }  
  
@@ -638,48 +639,34 @@ sendRecords = async function(data):Promise<boolean> {
     location: 'default'
   })
     .then(async (db: SQLiteObject) => {
-      //console.log('===========uploadingData = true');
+       console.log('===========uploadingData = true');
         this.uploadingData = true; 
         while (true) {
             let reslts = await this.getRecords(db);
+            console.log('Finish Get Records...');
+
             if (reslts.length==0){
               console.log('No records to send found in DB');
-              //console.log('===========uploadingData = false');
+              console.log('===========uploadingData = false, RETURN');
               this.uploadingData=false;
               return;
             }
-            if (this.dataUpload.mode=='backend' || this.dataUpload.mode=='localserver' ){
+            console.log('=========== starting send to backend');
+            if (this.globalconfig.dataUpload.mode=='backend' || this.globalconfig.dataUpload.mode=='localserver' ){
               let success = await this.sendRecords(reslts);
               if (success) {
                 await reslts.forEach( item =>  this.flagSentReslts(db,item));
               }
             }
-            //console.log('===========uploadingData = false');
+            console.log('=========== finished, next while loop');
             
       } // while
+        console.log('=========== UploadingData = false, EXIT END OF PROCESS=======');
         this.uploadingData=false;
     });
   };
 
-/*
-loadDataUploadCfg = function() {
-  this.dataUpload.apikey='';
-  this.dataUpload.apisecret='';
-  this.dataUpload.localserver='';
-  this.dataUpload.mode='';
-  this.storage.get('dataupload-apikey').then((val) => {
-    if (val!==null && val!='') this.dataUpload.apikey=val;
-  });
-  this.storage.get('dataupload-apisecret').then((val) => {
-    if (val!==null && val!='') this.dataUpload.apisecret=val;
-  });
-  this.storage.get('dataupload-localserver').then((val) => {
-    if (val!==null && val!='') this.dataUpload.localserver=val;
-  });
-  this.storage.get('dataupload-mode').then((val) => {
-    if (val!==null && val!='') this.dataUpload.mode=val;
-  });
-}*/
+ 
 
 selectDataUpload = function(data) {
   this.globalconfig.dataUpload.mode=  data;
@@ -716,6 +703,21 @@ configDataUpload = function() {
  secondsInterval=function(date1:Date,date2:Date) {
   return (date1.getTime()-date2.getTime())/1000
  };
+
+ fakedata () {
+  this.sqlite.create({
+    name: 'data.db',
+    location: 'default'
+  })
+    .then(async (db: SQLiteObject) => { 
+      let i = 0;
+      for (i=0;i<10000;i++) {
+          this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(), 'fake', '1234', '0'],'');
+      }
+    });
+ }
+
+
 
 }
 
