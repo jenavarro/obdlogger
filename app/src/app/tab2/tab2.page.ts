@@ -170,7 +170,7 @@ this.cloudSettings.exists()
   this.cloudSettings.load()
     .then((settings: any) => {
       // OBD Metrics configuration
-      this.globalconfig = settings;
+      this.globalconfig = JSON.parse(settings.data);
       if (this.globalconfig.obdmetrics !== undefined) {
         this.configureMetricsList();
       } 
@@ -191,9 +191,9 @@ configureMetricsList() {
     }
   }
 } 
-
+ 
 saveGlobalConfig () {
-  this.cloudSettings.save(this.globalconfig)
+  this.cloudSettings.save({data:JSON.stringify(this.globalconfig)})
   .then((savedSettings: any) => console.log("Saved Gobal settings "  ))
   .catch((error: any) => console.error('Error saving global configuration ' + error));
 }
@@ -211,16 +211,18 @@ resetMetrics() {
   } 
   this.saveMetricsCfg( );
 }
-
-saveMetricsCfg( ) {
-  setTimeout(() => {
+ 
+saveMetricsCfg( ) { 
     var enabledmetrics:string[];
     enabledmetrics=[];
-    this.obdmetrics.forEach(elem => {if (elem.metricSelectedToPoll) enabledmetrics.push(elem.name)});
-    //this.storage.set('obdmetrics',enabledmetrics).then((result) => {});
+    this.obdmetrics.forEach(elem => {
+      /*if (item !== null && elem.name=== item.name) {
+        elem.metricSelectedToPoll = !elem.metricSelectedToPoll;
+      }*/
+      if (elem.metricSelectedToPoll) enabledmetrics.push(elem.name)
+    }); 
     this.globalconfig.obdmetrics = enabledmetrics;
-    this.saveGlobalConfig();
-  },1000);
+    this.saveGlobalConfig(); 
 }
   checkBluetoothEnabled() { 
     this.bluetoothSerial.isEnabled().then(success => {
@@ -229,8 +231,7 @@ saveMetricsCfg( ) {
       this.showError("Please Enable Bluetooth")
     }); 
   }
-
-  
+ 
   listPairedDevices() { 
     this.bluetoothSerial.list().then(success => {
       this.pairedList = success;

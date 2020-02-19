@@ -65,12 +65,11 @@
   </ion-item>  
 </ion-list>
 
-  <ion-list [(ngModel)]="obdmetrics" ngDefaultControl >
-    <ion-list-header>Metrics</ion-list-header>
-  
-    <ion-item *ngFor="let i of obdmetrics;let j=index" value="{{j}}"   > 
+  <ion-list  ngDefaultControl >
+    <ion-list-header>Metrics</ion-list-header> 
+    <ion-item *ngFor="let i of obdmetrics;let j=index"  > 
       <ion-label>{{i.description}}</ion-label>
-      <ion-toggle slot="end"   color="success" checked="{{i.metricSelectedToPoll}}" (ionChange)="saveMetricsCfg( )"></ion-toggle>
+      <ion-toggle slot="end"   color="success" [(ngModel)]="i.metricSelectedToPoll" (ionChange)="saveMetricsCfg()"></ion-toggle>
     </ion-item>
   </ion-list>
   
