@@ -20,6 +20,7 @@
     "@angular/platform-browser-dynamic": "~8.1.2",
     "@angular/router": "~8.1.2",
     "@ionic-native/background-mode": "^5.21.5",
+    "@ionic-native/battery-status": "^5.21.5",
     "@ionic-native/bluetooth-serial": "^5.19.1",
     "@ionic-native/cloud-settings": "^5.21.5",
     "@ionic-native/core": "^5.0.0",
@@ -33,6 +34,7 @@
     "cordova-android": "^8.1.0",
     "cordova-plugin-advanced-http": "^2.4.0",
     "cordova-plugin-background-mode": "^0.7.3",
+    "cordova-plugin-battery-status": "^2.0.3",
     "cordova-plugin-bluetooth-serial": "^0.4.7",
     "cordova-plugin-cloud-settings": "^1.0.4",
     "cordova-plugin-file": "^6.0.2",
@@ -95,7 +97,8 @@
       "cordova-plugin-cloud-settings": {
         "ANDROID_BACKUP_SERVICE_KEY": "AEdPqrEAAAAITmrvs78xLVR4HK5oJtFUZ2cQbugUhElIkH56mQ"
       },
-      "cordova-plugin-background-mode": {}
+      "cordova-plugin-background-mode": {},
+      "cordova-plugin-battery-status": {}
     },
     "platforms": [
       "android"

@@ -11,6 +11,7 @@ import { HTTP } from '@ionic-native/http/ngx';
 import { getJSDocReturnTag } from 'typescript';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
 import { BackgroundMode } from '@ionic-native/background-mode/ngx';
+import { BatteryStatus } from '@ionic-native/battery-status/ngx';
 
 @Component({
   selector: 'app-tab2',
@@ -54,6 +55,7 @@ export class Tab2Page {
   isNetworkConnectivity:boolean=false;
   uploadingData:boolean=false;
   liveStatsNumRecordsToSend:number=0;
+  liveStatsBatteryStatus:number=-1;
   globalconfig={
       obdmetrics: [], 
       dataUpload:{apikey:'',apisecret:'',localserver:'',mode:''},
@@ -61,13 +63,14 @@ export class Tab2Page {
       sendstatusinfo:false
     };
 
-  constructor(private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
+  constructor(private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
     this.obdmetrics=[];
     this.lastConnectedToOBD = Date.now();
     this.loadGlobalConfig();
     this.setupDb();
     this.subscribeToNetworkChanges();
     this.keepSystemAwake();
+    this.enableSendBatteryStatus();
     var maincycle = setInterval( ()=> {
       /* 
         Execute every 20 seconds
@@ -77,8 +80,7 @@ export class Tab2Page {
           meanwhile if wifi network is available upload data
         5+ minutes after losing contact with OBD Device if not connected to energy (if not sending data)-> quit app, allow deep sleep
         10+ minutes after losing contact with OBD Device if not connected to energy (even sending data)-> quit app, allow deep sleep
-      */
-        
+      */ 
       // Attempt to connect
       if (!this.btIsConnecting && !this.btConnected ) {
         console.log('Re-attempting connection...');
@@ -97,7 +99,7 @@ export class Tab2Page {
         console.log('Disconnected from OBD for more than 5 minutes, disabling keep-awake');
         this.disableKeepSystemAwake();
       }
-      this.liveStatsGetRecordsToUpload();
+      this.liveStatsGetRecordsToUpload(); 
     } ,20000);
   }
 
@@ -110,7 +112,20 @@ export class Tab2Page {
     this.backgroundMode.disable();
     console.log('Disabling keeping system awake...');
   }
- 
+
+  enableSendBatteryStatus(){
+    const subscription = this.batteryStatus.onChange().subscribe(status => {
+      let stat='';
+      if (status.isPlugged) 
+        {stat='60';}
+      else 
+        {stat='40';}
+      console.log(status.level, status.isPlugged, stat); 
+      this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'battlevel', status.level.toString(), '0'],'');
+      this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'isplugged', stat, '0'],'');
+    }); 
+  }
+
   setupDb(){
     this.sqlite.create({
       name: 'data.db',
@@ -160,6 +175,7 @@ export class Tab2Page {
 }
   
 loadGlobalConfig() {
+  this.cloudSettings.enableDebug( );
 
 this.cloudSettings.exists()
 .then((exists: boolean) => {
