@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { NavController } from '@ionic/angular';
 import { BluetoothSerial } from '@ionic-native/bluetooth-serial/ngx';
 import { AlertController, ToastController } from '@ionic/angular';
@@ -12,6 +12,7 @@ import { getJSDocReturnTag } from 'typescript';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
 import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
+import { isNumber } from 'util';
 
 @Component({
   selector: 'app-tab2',
@@ -55,7 +56,9 @@ export class Tab2Page {
   isNetworkConnectivity:boolean=false;
   uploadingData:boolean=false;
   liveStatsNumRecordsToSend:number=0;
-  liveStatsBatteryStatus:number=-1;
+  lastRPMmetricvalue;
+  lastRPMmetricTimestamp; 
+  liveStatsBattery={level:-1,isPlugged:false, lastUnplugged:0}; 
   globalconfig={
       obdmetrics: [], 
       dataUpload:{apikey:'',apisecret:'',localserver:'',mode:''},
@@ -63,7 +66,7 @@ export class Tab2Page {
       sendstatusinfo:false
     };
 
-  constructor(private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
+  constructor(private changeRef: ChangeDetectorRef, private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
     this.obdmetrics=[];
     this.lastConnectedToOBD = Date.now();
     this.loadGlobalConfig();
@@ -99,6 +102,15 @@ export class Tab2Page {
         console.log('Disconnected from OBD for more than 5 minutes, disabling keep-awake');
         this.disableKeepSystemAwake();
       }
+      //5+ minutes after losing power and rpm metrics is zero or non existing
+      if (! this.liveStatsBattery.isPlugged && Math.abs((this.liveStatsBattery.lastUnplugged - Date.now())/1000) > 5 * 60) {
+         //5+ minutes after last RPM metric and last rpm metric was zero or ''
+        if (( this.lastRPMmetricvalue === '' || this.lastRPMmetricvalue=== '0') 
+          && Math.abs((this.lastRPMmetricTimestamp - Date.now())/1000) > 5 * 60) { 
+            console.log('5+ minutes after losing power and rpm metrics is zero or non existing, assuming car is off');
+            this.disableKeepSystemAwake();
+          }
+      }      
       this.liveStatsGetRecordsToUpload(); 
     } ,20000);
   }
@@ -123,6 +135,12 @@ export class Tab2Page {
       console.log(status.level, status.isPlugged, stat); 
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'battlevel', status.level.toString(), '0'],'');
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'isplugged', stat, '0'],'');
+      // if it was plugged and now it is not, resets time counter for how long it has been unplugged.
+      if (this.liveStatsBattery.isPlugged && !status.isPlugged) {
+        this.liveStatsBattery.lastUnplugged=Date.now();
+      }
+      this.liveStatsBattery.level= status.level;
+      this.liveStatsBattery.isPlugged=status.isPlugged;
     }); 
   }
 
@@ -402,6 +420,11 @@ saveMetricsCfg( ) {
       console.log(JSON.stringify(pdata));
   
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value, 0],'');
+      if (pdata.name=='rpm') { 
+        this.lastRPMmetricTimestamp = pdata.ts;
+        this.lastRPMmetricvalue = pdata.value;
+        
+      }
     } 
 
     execSql = function (sSql:string,params:string[],logentry:string) {
@@ -645,6 +668,7 @@ sendRecords = async function(data):Promise<boolean> {
                   db.executeSql('SELECT  COUNT(*) AS countrecs FROM livemetricstable ;', [])
                   .then((data) => {
                     this.liveStatsNumRecordsToSend = data.rows.item(0).countrecs;
+                    console.log('Found records to send: ' + this.liveStatsNumRecordsToSend );
                   })
                   .catch(e => console.log('Error SQL> ' + e)); 
       });
@@ -673,6 +697,7 @@ sendRecords = async function(data):Promise<boolean> {
               let success = await this.sendRecords(reslts);
               if (success) {
                 await reslts.forEach( item =>  this.flagSentReslts(db,item));
+                this.changeRef.detectChanges();  
               }
             }
             console.log('=========== finished, next while loop');
@@ -728,7 +753,7 @@ configDataUpload = function() {
   })
     .then(async (db: SQLiteObject) => { 
       let i = 0;
-      for (i=0;i<10000;i++) {
+      for (i=0;i<100000;i++) {
           this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(), 'fake', '1234', '0'],'');
       }
     });
