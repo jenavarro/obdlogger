@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component } from '@angular/core';
 import { NavController } from '@ionic/angular';
 import { BluetoothSerial } from '@ionic-native/bluetooth-serial/ngx';
 import { AlertController, ToastController } from '@ionic/angular';
@@ -8,11 +8,14 @@ import { $ } from 'protractor';
 import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
 import { HTTP } from '@ionic-native/http/ngx';
-import { getJSDocReturnTag } from 'typescript';
+import { getJSDocReturnTag, ExitStatus } from 'typescript';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
 import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
 import { isNumber } from 'util';
+import { File } from '@ionic-native/file/ngx';
+import * as moment from 'moment';
+import * as _ from 'underscore';
 
 @Component({
   selector: 'app-tab2',
@@ -28,12 +31,12 @@ export class Tab2Page {
   };
 
   compareWith = this.compareWithFn;
-
   pairedList: [pairedlist];
+  targetList=[];
   listToggle: boolean = false;
   pairedDeviceID: number = 0;
   dataSend: string = "";
-  connstatus: string="";
+  connstatus: string="Disconnected";
   writeDelay:number= 50;
   btReceivedData :string = '';
   btLastCheckedReceivedData :string = '';
@@ -45,6 +48,7 @@ export class Tab2Page {
   btLastReceivedData = '';
   inmemoryqty=0;
   globalLog =[];
+  maincycle;
   globalLogEnabled = true;   // disable when generating a build
   defaultbluetoothdev='';
   showbluetoothconfig=false;
@@ -58,6 +62,8 @@ export class Tab2Page {
   liveStatsNumRecordsToSend:number=0;
   lastRPMmetricvalue;
   lastRPMmetricTimestamp; 
+  liveMetrics={};
+  liveStatsNumRecordsSinceConnected:number=0;
   liveStatsBattery={level:-1,isPlugged:false, lastUnplugged:0}; 
   globalconfig={
       obdmetrics: [], 
@@ -65,17 +71,53 @@ export class Tab2Page {
       bluetoothDeviceToUse : {address:'', devicename: ''},
       sendstatusinfo:false
     };
+     
+    startMain() {
+      this.obdmetrics=[];
+      this.liveMetrics={};
+      this.targetList= ['InfluxDB','CSV'];
+      this.lastConnectedToOBD = Date.now();
+      this.loadGlobalConfig();
+      this.setupDb();
+      this.subscribeToNetworkChanges();
+      this.keepSystemAwake();
+      this.enableSendBatteryStatus();
+  
+      this.repeatPeriodically();
+      this.maincycle = setInterval( ()=> {
+        this.repeatPeriodically();
+  
+      } ,20000);
+    }
+/*
+    timeSinceConnected(){
+      moment.locale('en');
+      return moment.utc(this.lastConnectedToOBD).fromNow();
+    }*/
 
-  constructor(private changeRef: ChangeDetectorRef, private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
-    this.obdmetrics=[];
-    this.lastConnectedToOBD = Date.now();
-    this.loadGlobalConfig();
-    this.setupDb();
-    this.subscribeToNetworkChanges();
-    this.keepSystemAwake();
-    this.enableSendBatteryStatus();
-    var maincycle = setInterval( ()=> {
-      /* 
+  constructor(   private file:File , private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
+
+    this.startMain();
+  }
+
+  navigateTo(page) {
+    // Stop everything
+    clearInterval( this.maincycle);
+    this.btDisconnect();
+    this.navCtrl.navigateForward(page);
+  }
+
+  ionViewDidEnter(event) {
+    console.log("Back from other tab");
+    
+    clearInterval( this.maincycle);
+    this.btDisconnect();
+    this.startMain();
+  }
+  
+
+  repeatPeriodically() {
+         /* 
         Execute every 20 seconds
         On plugged-in -> reset timer, start trying to connect to OBD device every 20
         On connect to OBD, collect metrics in real time
@@ -84,19 +126,30 @@ export class Tab2Page {
         5+ minutes after losing contact with OBD Device if not connected to energy (if not sending data)-> quit app, allow deep sleep
         10+ minutes after losing contact with OBD Device if not connected to energy (even sending data)-> quit app, allow deep sleep
       */ 
+     this.liveStatsGetRecordsToUpload();
       // Attempt to connect
       if (!this.btIsConnecting && !this.btConnected ) {
         console.log('Re-attempting connection...');
         this.checkBluetoothEnabled();
       }
-      // Upload data if there is wifi
-      if ( !this.btConnected && this.isNetworkConnectivity && this.liveStatsNumRecordsToSend >0 ) {     //!this.btIsConnecting &&
+
+      // Upload data if there is wifi and not send to csv
+      if ( !this.btConnected && this.isNetworkConnectivity && this.liveStatsNumRecordsToSend >0 && this.globalconfig.dataUpload.mode!=='CSV') {     //!this.btIsConnecting &&
         if (this.uploadingData) {
           console.log('There\'wifi!, attempting to upload data but still uploading previous cycle, retrying in 20 seconds...');
           return;
         }
         this.uploadData();
       }
+      // Upload data if is sending to csv
+      if ( this.globalconfig.dataUpload.mode=='CSV' && this.liveStatsNumRecordsToSend >5000 ) {     //!this.btIsConnecting &&
+        if (this.uploadingData) {
+          console.log('Attempting to save to csv but still uploading previous cycle, retrying in 20 seconds...');
+          return;
+        }
+        this.uploadData();
+      }
+
       //5+ minutes after losing contact with OBD Device  if not sending data  allow deep sleep
       if (!this.btConnected && Math.abs((this.lastConnectedToOBD - Date.now())/1000) > 5 * 60) {
         console.log('Disconnected from OBD for more than 5 minutes, disabling keep-awake');
@@ -110,17 +163,17 @@ export class Tab2Page {
             console.log('5+ minutes after losing power and rpm metrics is zero or non existing, assuming car is off');
             this.disableKeepSystemAwake();
           }
-      }      
-      this.liveStatsGetRecordsToUpload(); 
-    } ,20000);
+      }
   }
-
+  
   keepSystemAwake() {
+    this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'systemforceawake', '60', '0'],'');
     this.backgroundMode.enable();
     console.log('Keeping system awake...');
   }
   
   disableKeepSystemAwake() {
+    this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'systemforceawake', '40', '0'],'');
     this.backgroundMode.disable();
     console.log('Disabling keeping system awake...');
   }
@@ -131,8 +184,8 @@ export class Tab2Page {
       if (status.isPlugged) 
         {stat='60';}
       else 
-        {stat='40';}
-      console.log(status.level, status.isPlugged, stat); 
+        {stat='40';} 
+
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'battlevel', status.level.toString(), '0'],'');
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'isplugged', stat, '0'],'');
       // if it was plugged and now it is not, resets time counter for how long it has been unplugged.
@@ -144,25 +197,33 @@ export class Tab2Page {
     }); 
   }
 
+  logSystemEvent(level:string,description:string){
+    this.execSql('INSERT INTO systemevents VALUES (?,?,?,?,?)', [null,Date.now().toString(),level, description ],'');
+  }
+
   setupDb(){
-    this.sqlite.create({
+     this.sqlite.create({
       name: 'data.db',
       location: 'default'
     })
       .then((db: SQLiteObject) => {
-     
-    
+      
         db.executeSql('CREATE TABLE IF NOT EXISTS livemetricstable (rowid INTEGER PRIMARY KEY,ts INT, name text, value text, tripId INT )')
         .then(() => {
           console.log('Executed CREATE TABLE IF NOT EXISTS livemetricstable')
-           }).catch(e => console.log(e));
+           }).catch((e) => console.log("ERR CREATING TABLE livemetricstable "  + JSON.stringify(e)));
         db.executeSql('CREATE TABLE IF NOT EXISTS trips (startedTs INTEGER PRIMARY KEY, duration INT)')
         .then(() => {
           console.log('Executed CREATE TABLE IF NOT EXISTS trips')
-           }).catch(e => console.log(e));
+        }).catch((e) => console.log("ERR CREATING TABLE trips " + JSON.stringify(e)));
+        db.executeSql('CREATE TABLE IF NOT EXISTS systemevents (rowid INTEGER PRIMARY KEY,startedTs  INTEGER  , level test, description text )')
+        .then(() => {
+          console.log('Executed CREATE TABLE IF NOT EXISTS systemevents')
+        }).catch((e) => console.log("ERR CREATING TABLE systemevents " + JSON.stringify(e)));
             
       })
-      .catch(e => console.log(e));
+      .catch(e => console.log(e)) ; //
+      
   }  
 
   dropDBTables(){
@@ -182,29 +243,23 @@ export class Tab2Page {
       })
       .catch(e => console.log(e));
   } 
-
-  selectBtDevice(ev) {
-    if (ev.detail.value === null || ev.detail.value <0) return;
-    console.log('Changed BT device to use:' + this.pairedList[ev.detail.value].name);
-    this.globalconfig.bluetoothDeviceToUse = {address:this.pairedList[ev.detail.value].address, devicename:this.pairedList[ev.detail.value].name};
-    this.saveGlobalConfig();
-    this.btDisconnect();
-    this.connect(this.pairedList[ev.detail.value].address, this.pairedList[ev.detail.value].name);
-}
-  
+ 
 loadGlobalConfig() {
   this.cloudSettings.enableDebug( );
-
+ 
 this.cloudSettings.exists()
 .then((exists: boolean) => {
-  console.log("Saved settings exist: " + exists) ;
+  //console.log("Saved settings exist: " + exists) ;
   if (!exists) {
     this.saveGlobalConfig();
-  } 
+    console.error('Global config does not exist');
+
+  } else { 
   this.cloudSettings.load()
     .then((settings: any) => {
       // OBD Metrics configuration
       this.globalconfig = JSON.parse(settings.data);
+      console.log('Saved settings loaded: ' + JSON.stringify(settings));
       if (this.globalconfig.obdmetrics !== undefined) {
         this.configureMetricsList();
       } 
@@ -213,7 +268,8 @@ this.cloudSettings.exists()
       this.configureMetricsList();
       console.error('Error retrieving global configuration ' + error);
     });
-  }); 
+  }
+   }); 
 }
 
 configureMetricsList() {
@@ -232,33 +288,8 @@ saveGlobalConfig () {
   .catch((error: any) => console.error('Error saving global configuration ' + error));
 }
 
-resetMetrics() {
-  let i:number=0;
-  for (var k=0;k<obdinfo.PIDS.length;k++){
-    var itm = obdinfo.PIDS[k];
-    if (itm.mode==obdinfo.modeRealTime && itm.name !=='' ) { 
-      if (this.obdmetrics[k].metricSelectedToPoll!==itm.isDefault) {  // To avoid setting the same value as it already exists, which would fire an angular update
-        this.obdmetrics[k].metricSelectedToPoll=itm.isDefault;
-      }
-      i=i+1; 
-    }
-  } 
-  this.saveMetricsCfg( );
-}
- 
-saveMetricsCfg( ) { 
-    var enabledmetrics:string[];
-    enabledmetrics=[];
-    this.obdmetrics.forEach(elem => {
-      /*if (item !== null && elem.name=== item.name) {
-        elem.metricSelectedToPoll = !elem.metricSelectedToPoll;
-      }*/
-      if (elem.metricSelectedToPoll) enabledmetrics.push(elem.name)
-    }); 
-    this.globalconfig.obdmetrics = enabledmetrics;
-    this.saveGlobalConfig(); 
-}
-  checkBluetoothEnabled() { 
+  
+  public checkBluetoothEnabled() { 
     this.bluetoothSerial.isEnabled().then(success => {
       this.listPairedDevices();
     }, error => {
@@ -271,14 +302,13 @@ saveMetricsCfg( ) {
       this.pairedList = success;
       this.pairedList.forEach(item => item.isSelected=false);
       this.listToggle = true;
-      
          console.log('Reading default device data: ' +  this.globalconfig.bluetoothDeviceToUse.devicename);
-        if (this.globalconfig.bluetoothDeviceToUse==null) return;
+        if (this.globalconfig.bluetoothDeviceToUse==null || this.globalconfig.bluetoothDeviceToUse.devicename== "" ) return;
         let i = this.pairedList.findIndex(item => item.address === this.globalconfig.bluetoothDeviceToUse.address) ;
         if (i>-1) {
           this.pairedList[i].isSelected=true
         }
-        if (this.globalconfig.bluetoothDeviceToUse.address !== undefined) {
+        if (!this.btConnected && this.globalconfig.bluetoothDeviceToUse.address !== undefined) {
           this.connect(this.globalconfig.bluetoothDeviceToUse.address,this.globalconfig.bluetoothDeviceToUse.devicename);
         }  
     }, error => {
@@ -288,28 +318,33 @@ saveMetricsCfg( ) {
   }
  
   connect (address, devicename) { 
-    this.connstatus=" Connecting to " + devicename;
+    if (address=="") return;
+    this.connstatus=" Connecting...";// + devicename;
     this.btIsConnecting=true;
     console.log(this.connstatus);
     this.bluetoothSerial.connect(address).subscribe(success => {
+      this.liveStatsNumRecordsSinceConnected=0;
       this.btConnected = true;
       this.btIsConnecting = false;
-      this.connstatus=" Connected";
+      this.connstatus="Connected";
       this.defaultbluetoothdev=devicename;
       console.log(this.connstatus);
       this.showToast("Successfully Connected");
       this.deviceConnected();
     }, error => {
-      this.connstatus=" Error";
+      this.connstatus="Error";
       this.btIsConnecting = false;
       this.btConnected = false;
       console.log('BT Conn. Status: ' + this.connstatus);
       this.showError("Error: Connecting to Device");
+      this.btDisconnect();
+
     }); 
   }
 
   deviceConnected ()  { 
     this.lastConnectedToOBD = Date.now();
+    this.keepSystemAwake();
     // Subscribe to data receiving as soon as the delimiter is read
     this.bluetoothSerial.subscribe('>').subscribe(success => {
       //this.showToast("Succesful subscription");
@@ -378,6 +413,7 @@ saveMetricsCfg( ) {
     };
     
     btDataReceived(data) {
+      this.lastConnectedToOBD = Date.now();
       var currentString, arrayOfCommands;
     
       currentString = this.receivedData + data.toString('utf8'); // making sure it's a utf8 string
@@ -415,17 +451,30 @@ saveMetricsCfg( ) {
       if ( event!=='dataReceived' || text.value === 'NO DATA' || text.name === undefined || text.value === undefined) {
           return;
       }
-      //console.log('New metric for ' + text.name);
+      console.log('New metric for ' + text.name);
       pdata = {ts:Date.now(),name:text.name,value:text.value};
-      console.log(JSON.stringify(pdata));
-  
+      //console.log(JSON.stringify(pdata));
+      this.liveStatsNumRecordsSinceConnected++;
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value, 0],'');
       if (pdata.name=='rpm') { 
         this.lastRPMmetricTimestamp = pdata.ts;
         this.lastRPMmetricvalue = pdata.value;
-        
       }
-    } 
+      if (this.liveMetrics[pdata.name]==undefined) {
+        var mt =_.findWhere(this.obdmetrics, { name: pdata.name }); 
+        this.liveMetrics[pdata.name]={};
+        this.liveMetrics[pdata.name].description = mt.description;
+        this.liveMetrics[pdata.name].name=mt.name;
+        this.liveMetrics[pdata.name].unit=mt.unit;
+        this.liveMetrics[pdata.name].type='';  
+      }
+      this.liveMetrics[pdata.name].value=pdata.value;
+      if (this.liveMetrics[pdata.name].unit=='sec.' || this.liveMetrics[pdata.name].type=='s' ) {
+        this.liveMetrics[pdata.name].value=moment.utc(parseInt(pdata.value)).format('HH:mm:ss'); 
+        this.liveMetrics[pdata.name].unit='';  
+        this.liveMetrics[pdata.name].type='s';  
+      }
+    }
 
     execSql = function (sSql:string,params:string[],logentry:string) {
 
@@ -467,8 +516,9 @@ saveMetricsCfg( ) {
       this.btConnected = false;
       this.btIsConnecting=false;
       this.bluetoothSerial.disconnect();
-      this.connstatus="";
+      this.connstatus="Disconnected";
       console.log('Disconnected');
+      this.liveStatsNumRecordsSinceConnected=0;
       this.lastConnectedToOBD = Date.now();
     };
     
@@ -629,8 +679,8 @@ sendRecords = async function(data):Promise<boolean> {
   let headers = {
     'Content-Type': 'application/json'
   };
-  if (this.globalconfig.dataUpload.mode==='localserver') {
-    url = 'http://' + this.globalconfig.dataUpload.localserver + '/write?db=obdmetrics&precision=ms'; 
+  if (this.globalconfig.dataUpload.mode==='InfluxDB') {
+    url = this.globalconfig.dataUpload.localserver + '/write?db=obdmetrics&precision=ms'; 
     // Set HTTP POST InfluxDB format
     var datainfluxdb='';
     data.forEach(itm => {
@@ -682,6 +732,7 @@ sendRecords = async function(data):Promise<boolean> {
     .then(async (db: SQLiteObject) => {
        console.log('===========uploadingData = true');
         this.uploadingData = true; 
+
         while (true) {
             let reslts = await this.getRecords(db);
             console.log('Finish Get Records...');
@@ -689,17 +740,25 @@ sendRecords = async function(data):Promise<boolean> {
             if (reslts.length==0){
               console.log('No records to send found in DB');
               console.log('===========uploadingData = false, RETURN');
-              this.uploadingData=false;
-              return;
+              break; 
             }
             console.log('=========== starting send to backend');
-            if (this.globalconfig.dataUpload.mode=='backend' || this.globalconfig.dataUpload.mode=='localserver' ){
+            if (this.globalconfig.dataUpload.mode=='backend' || this.globalconfig.dataUpload.mode=='InfluxDB' ){
               let success = await this.sendRecords(reslts);
               if (success) {
                 await reslts.forEach( item =>  this.flagSentReslts(db,item));
-                this.changeRef.detectChanges();  
+                this.changeRef.detectChanges(); 
               }
             }
+            if ( this.globalconfig.dataUpload.mode=='CSV' ){ 
+
+               await this.saveDataToCSV(reslts);
+               console.log('=========== setting records as sent - Start');
+               await reslts.forEach( item =>  this.flagSentReslts(db,item));
+               console.log('=========== setting records as sent - END');
+            }
+
+ 
             console.log('=========== finished, next while loop');
             
       } // while
@@ -708,18 +767,33 @@ sendRecords = async function(data):Promise<boolean> {
     });
   };
 
+  saveDataToCSV = async function (data) { 
+     await new Promise(resolve  => {
+    console.log('=========== start send csv'); 
+    let dta:string;
+    data.forEach( itm => dta = dta + itm.name + ','  + itm.value + ', ' + itm.ts + '\n');
+    let filename =  "obdmetrics-" + new Date().toISOString().split('T')[0] + ".csv";
+
+    this.file.resolveLocalFilesystemUrl(this.file.externalDataDirectory)
+      .then( (dirEntry:any) =>  { 
+        dirEntry.getFile(filename, {create: true, exclusive: false}, function(fileEntry) {
+
+          fileEntry.createWriter(function (fileWriter) {
+          try {
+              fileWriter.seek(fileWriter.length);
+          }
+          catch (e) {
+              console.log("file doesn't exist!");
+          }
+          fileWriter.write(dta);
+          console.log('=========== end send csv');
+          resolve();
+      });  
+      })});
+    });
+  }
+   
  
-
-selectDataUpload = function(data) {
-  this.globalconfig.dataUpload.mode=  data;
-  this.saveGlobalConfig();
-  console.log('Changed default upload mode to ' + data);
-}
-configDataUpload = function() {
-  this.saveGlobalConfig();   
-}
-
-
   // Networking ---------------------------------------------------------------------------------------------------------
 
   subscribeToNetworkChanges = function () {

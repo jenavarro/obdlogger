@@ -12,6 +12,7 @@ import { HTTP } from '@ionic-native/http/ngx';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
 import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
+import { File } from '@ionic-native/file/ngx';
 
 @NgModule({
   imports: [
@@ -22,7 +23,7 @@ import { BatteryStatus } from '@ionic-native/battery-status/ngx';
     IonicStorageModule.forRoot()  
   ],
   declarations: [Tab2Page], 
-  providers: [  SQLite,Network,HTTP, CloudSettings ,BackgroundMode, BatteryStatus],
+  providers: [  File, SQLite,Network,HTTP, CloudSettings ,BackgroundMode, BatteryStatus],
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Tab2PageModule {}
