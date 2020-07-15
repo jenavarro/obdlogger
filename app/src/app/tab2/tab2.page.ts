@@ -3,19 +3,29 @@ import { NavController } from '@ionic/angular';
 import { BluetoothSerial } from '@ionic-native/bluetooth-serial/ngx';
 import { AlertController, ToastController } from '@ionic/angular';
 import { obdinfo } from './obdInfo.js';
-//import { Storage } from '@ionic/storage';
-import { $ } from 'protractor';
+ import { $ } from 'protractor';
 import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
 import { HTTP } from '@ionic-native/http/ngx';
 import { getJSDocReturnTag, ExitStatus } from 'typescript';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
-import { BackgroundMode } from '@ionic-native/background-mode/ngx';
+import { Insomnia } from '@ionic-native/insomnia/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
 import { isNumber } from 'util';
 import { File } from '@ionic-native/file/ngx';
 import * as moment from 'moment';
 import * as _ from 'underscore';
+import { BackgroundGeolocation, BackgroundGeolocationConfig, BackgroundGeolocationEvents, BackgroundGeolocationResponse, BackgroundGeolocationAuthorizationStatus } from '@ionic-native/background-geolocation/ngx';
+import { Brightness } from '@ionic-native/brightness/ngx';
+
+const gpsConfig: BackgroundGeolocationConfig = {
+  desiredAccuracy: 10,
+  stationaryRadius: 20,
+  distanceFilter: 30,
+  startForeground:true,
+  debug: false,  
+  stopOnTerminate: false   
+};
 
 @Component({
   selector: 'app-tab2',
@@ -69,33 +79,33 @@ export class Tab2Page {
       obdmetrics: [], 
       dataUpload:{apikey:'',apisecret:'',localserver:'',mode:''},
       bluetoothDeviceToUse : {address:'', devicename: ''},
-      sendstatusinfo:false
+      sendstatusinfo:false,
+      gpsTracking:true,
+      dimscreenbrightness:50
     };
-     
+
+
     startMain() {
       this.obdmetrics=[];
       this.liveMetrics={};
       this.targetList= ['InfluxDB','CSV'];
+
       this.lastConnectedToOBD = Date.now();
       this.loadGlobalConfig();
       this.setupDb();
       this.subscribeToNetworkChanges();
       this.keepSystemAwake();
       this.enableSendBatteryStatus();
-  
+      this.enableGPSTracking();
       this.repeatPeriodically();
       this.maincycle = setInterval( ()=> {
         this.repeatPeriodically();
   
       } ,20000);
     }
-/*
-    timeSinceConnected(){
-      moment.locale('en');
-      return moment.utc(this.lastConnectedToOBD).fromNow();
-    }*/
+ 
 
-  constructor(   private file:File , private batteryStatus: BatteryStatus,private backgroundMode: BackgroundMode, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
+  constructor(private brightness: Brightness,private insomnia: Insomnia, private backgroundGeolocation: BackgroundGeolocation,  private file:File , private batteryStatus: BatteryStatus,private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
 
     this.startMain();
   }
@@ -107,9 +117,40 @@ export class Tab2Page {
     this.navCtrl.navigateForward(page);
   }
 
+  enableGPSTracking(){
+  
+    if (!this.globalconfig.gpsTracking) return;
+
+    this.backgroundGeolocation.checkStatus().then((status) => {
+      console.log('[INFO] BackgroundGeolocation service is running', status.isRunning);
+      console.log('[INFO] BackgroundGeolocation services enabled', status.locationServicesEnabled);
+      console.log('[INFO] BackgroundGeolocation auth status: ' + status.authorization);
+  
+      if (!status.locationServicesEnabled) { 
+          return this.backgroundGeolocation.showLocationSettings(); 
+      }
+      if (status.authorization==BackgroundGeolocationAuthorizationStatus.NOT_AUTHORIZED) { 
+          return this.backgroundGeolocation.showAppSettings(); 
+      }
+    });
+   
+    this.backgroundGeolocation.configure(gpsConfig)
+      .then(() => {
+        this.backgroundGeolocation.on(BackgroundGeolocationEvents.location).subscribe((location: BackgroundGeolocationResponse) => {
+          console.log('[INFO] Location: ' + location.time + ', Lat: ' + location.latitude + ', Lon: ' + location.longitude); 
+          var objdata={name:'location', value:JSON.stringify({"latitude":location.latitude,"longitude":location.longitude})}; 
+          this.btEventEmit ('dataReceived',objdata);
+ 
+          // IMPORTANT:  You must execute the finish method here to inform the native plugin that you're finished,
+          // and the background-task may be completed.  You must do this regardless if your operations are successful or not.
+          // IF YOU DON'T, ios will CRASH YOUR APP for spending too much time in the background.
+          //this.backgroundGeolocation.finish(); // FOR IOS ONLY
+        });
+  });
+  }
+
   ionViewDidEnter(event) {
-    console.log("Back from other tab");
-    
+    // When navigating back to main page, restart connectivity
     clearInterval( this.maincycle);
     this.btDisconnect();
     this.startMain();
@@ -129,22 +170,22 @@ export class Tab2Page {
      this.liveStatsGetRecordsToUpload();
       // Attempt to connect
       if (!this.btIsConnecting && !this.btConnected ) {
-        console.log('Re-attempting connection...');
+        console.log('[INFO] Re-attempting connection...');
         this.checkBluetoothEnabled();
       }
 
       // Upload data if there is wifi and not send to csv
-      if ( !this.btConnected && this.isNetworkConnectivity && this.liveStatsNumRecordsToSend >0 && this.globalconfig.dataUpload.mode!=='CSV') {     //!this.btIsConnecting &&
+      if ( !this.btConnected && this.isNetworkConnectivity && this.liveStatsNumRecordsToSend >0 && this.globalconfig.dataUpload.mode!=='CSV') {     
         if (this.uploadingData) {
-          console.log('There\'wifi!, attempting to upload data but still uploading previous cycle, retrying in 20 seconds...');
+          console.log('[INFO] Wifi detected, attempting to upload data but still uploading previous cycle, retrying in 20 seconds...');
           return;
         }
         this.uploadData();
       }
-      // Upload data if is sending to csv
-      if ( this.globalconfig.dataUpload.mode=='CSV' && this.liveStatsNumRecordsToSend >5000 ) {     //!this.btIsConnecting &&
+      // Upload data if is sending to 
+      if ( this.globalconfig.dataUpload.mode=='CSV' && this.liveStatsNumRecordsToSend >0 ) {   
         if (this.uploadingData) {
-          console.log('Attempting to save to csv but still uploading previous cycle, retrying in 20 seconds...');
+          console.log('[INFO] Attempting to save to csv but still uploading previous cycle, retrying in 20 seconds...');
           return;
         }
         this.uploadData();
@@ -152,7 +193,7 @@ export class Tab2Page {
 
       //5+ minutes after losing contact with OBD Device  if not sending data  allow deep sleep
       if (!this.btConnected && Math.abs((this.lastConnectedToOBD - Date.now())/1000) > 5 * 60) {
-        console.log('Disconnected from OBD for more than 5 minutes, disabling keep-awake');
+        console.log('[INFO] Disconnected from OBD for more than 5 minutes, disabling keep-awake');
         this.disableKeepSystemAwake();
       }
       //5+ minutes after losing power and rpm metrics is zero or non existing
@@ -160,7 +201,7 @@ export class Tab2Page {
          //5+ minutes after last RPM metric and last rpm metric was zero or ''
         if (( this.lastRPMmetricvalue === '' || this.lastRPMmetricvalue=== '0') 
           && Math.abs((this.lastRPMmetricTimestamp - Date.now())/1000) > 5 * 60) { 
-            console.log('5+ minutes after losing power and rpm metrics is zero or non existing, assuming car is off');
+            console.log('[INFO] 5+ minutes after losing power and rpm metrics is zero or non existing, assuming car is off');
             this.disableKeepSystemAwake();
           }
       }
@@ -168,14 +209,21 @@ export class Tab2Page {
   
   keepSystemAwake() {
     this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'systemforceawake', '60', '0'],'');
-    this.backgroundMode.enable();
-    console.log('Keeping system awake...');
+    
+    this.insomnia.keepAwake()
+      .then(
+        () => console.log('[INFO] Keeping system awake...'),
+        () => console.log('[ERROR] Keeping system awake...')
+      );
   }
   
   disableKeepSystemAwake() {
     this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,Date.now().toString(),'systemforceawake', '40', '0'],'');
-    this.backgroundMode.disable();
-    console.log('Disabling keeping system awake...');
+    this.insomnia.allowSleepAgain()
+      .then(
+        () => console.log('[INFO] Disable keeping system awake...'),
+        () => console.log('[ERROR] Disable keeping system awake...')
+      );
   }
 
   enableSendBatteryStatus(){
@@ -210,63 +258,46 @@ export class Tab2Page {
       
         db.executeSql('CREATE TABLE IF NOT EXISTS livemetricstable (rowid INTEGER PRIMARY KEY,ts INT, name text, value text, tripId INT )')
         .then(() => {
-          console.log('Executed CREATE TABLE IF NOT EXISTS livemetricstable')
+          console.log('[INFO] Executed CREATE TABLE IF NOT EXISTS livemetricstable')
            }).catch((e) => console.log("ERR CREATING TABLE livemetricstable "  + JSON.stringify(e)));
         db.executeSql('CREATE TABLE IF NOT EXISTS trips (startedTs INTEGER PRIMARY KEY, duration INT)')
         .then(() => {
-          console.log('Executed CREATE TABLE IF NOT EXISTS trips')
+          console.log('[INFO] Executed CREATE TABLE IF NOT EXISTS trips')
         }).catch((e) => console.log("ERR CREATING TABLE trips " + JSON.stringify(e)));
         db.executeSql('CREATE TABLE IF NOT EXISTS systemevents (rowid INTEGER PRIMARY KEY,startedTs  INTEGER  , level test, description text )')
         .then(() => {
-          console.log('Executed CREATE TABLE IF NOT EXISTS systemevents')
+          console.log('[INFO] Executed CREATE TABLE IF NOT EXISTS systemevents')
         }).catch((e) => console.log("ERR CREATING TABLE systemevents " + JSON.stringify(e)));
             
       })
-      .catch(e => console.log(e)) ; //
+      .catch(e => console.log((e) => console.log("[INFO]  " + JSON.stringify(e))));
       
   }  
 
-  dropDBTables(){
-    this.sqlite.create({
-      name: 'data.db',
-      location: 'default'
-    })
-      .then((db: SQLiteObject) => {
-     
-    
-        db.executeSql('DROP TABLE  livemetricstable  ')
-        .then(() => {
-          this.setupDb();
-          console.log('Dropped table livemetrics');
-           }).catch(e => console.log(e));
-            
-      })
-      .catch(e => console.log(e));
-  } 
+
  
 loadGlobalConfig() {
   this.cloudSettings.enableDebug( );
  
 this.cloudSettings.exists()
-.then((exists: boolean) => {
-  //console.log("Saved settings exist: " + exists) ;
+.then((exists: boolean) => { 
   if (!exists) {
     this.saveGlobalConfig();
-    console.error('Global config does not exist');
+    console.error('[INFO] Global config does not exist');
 
   } else { 
   this.cloudSettings.load()
     .then((settings: any) => {
       // OBD Metrics configuration
       this.globalconfig = JSON.parse(settings.data);
-      console.log('Saved settings loaded: ' + JSON.stringify(settings));
+      console.log('[INFO] Saved settings loaded: ' + JSON.stringify(settings));
       if (this.globalconfig.obdmetrics !== undefined) {
         this.configureMetricsList();
       } 
     } )
     .catch((error: any) => {
       this.configureMetricsList();
-      console.error('Error retrieving global configuration ' + error);
+      console.error('[INFO] Error retrieving global configuration ' + error);
     });
   }
    }); 
@@ -284,7 +315,7 @@ configureMetricsList() {
  
 saveGlobalConfig () {
   this.cloudSettings.save({data:JSON.stringify(this.globalconfig)})
-  .then((savedSettings: any) => console.log("Saved Gobal settings "  ))
+  .then((savedSettings: any) => console.log("[INFO] Saved Gobal settings "  ))
   .catch((error: any) => console.error('Error saving global configuration ' + error));
 }
 
@@ -293,7 +324,9 @@ saveGlobalConfig () {
     this.bluetoothSerial.isEnabled().then(success => {
       this.listPairedDevices();
     }, error => {
-      this.showError("Please Enable Bluetooth")
+      // Do not popup message otherwise would be constantly nagging the user
+      //this.bluetoothSerial.showBluetoothSettings();
+      this.connstatus ="Bluetooth disconnected"
     }); 
   }
  
@@ -302,7 +335,7 @@ saveGlobalConfig () {
       this.pairedList = success;
       this.pairedList.forEach(item => item.isSelected=false);
       this.listToggle = true;
-         console.log('Reading default device data: ' +  this.globalconfig.bluetoothDeviceToUse.devicename);
+         console.log('[INFO] Reading default device data: ' +  this.globalconfig.bluetoothDeviceToUse.devicename);
         if (this.globalconfig.bluetoothDeviceToUse==null || this.globalconfig.bluetoothDeviceToUse.devicename== "" ) return;
         let i = this.pairedList.findIndex(item => item.address === this.globalconfig.bluetoothDeviceToUse.address) ;
         if (i>-1) {
@@ -311,8 +344,7 @@ saveGlobalConfig () {
         if (!this.btConnected && this.globalconfig.bluetoothDeviceToUse.address !== undefined) {
           this.connect(this.globalconfig.bluetoothDeviceToUse.address,this.globalconfig.bluetoothDeviceToUse.devicename);
         }  
-    }, error => {
-      this.showError("Please Enable Bluetooth")
+    }, error => { 
       this.listToggle = false;
     }); 
   }
@@ -321,60 +353,43 @@ saveGlobalConfig () {
     if (address=="") return;
     this.connstatus=" Connecting...";// + devicename;
     this.btIsConnecting=true;
-    console.log(this.connstatus);
+    console.log('[INFO] '+ this.connstatus);
     this.bluetoothSerial.connect(address).subscribe(success => {
       this.liveStatsNumRecordsSinceConnected=0;
       this.btConnected = true;
       this.btIsConnecting = false;
       this.connstatus="Connected";
       this.defaultbluetoothdev=devicename;
-      console.log(this.connstatus);
-      this.showToast("Successfully Connected");
+      console.log('[INFO] '+ this.connstatus); 
       this.deviceConnected();
     }, error => {
       this.connstatus="Error";
       this.btIsConnecting = false;
       this.btConnected = false;
-      console.log('BT Conn. Status: ' + this.connstatus);
-      this.showError("Error: Connecting to Device");
+      console.log('[INFO] BT Conn. Status: ' + this.connstatus); 
       this.btDisconnect();
 
     }); 
   }
-
+ 
   deviceConnected ()  { 
     this.lastConnectedToOBD = Date.now();
     this.keepSystemAwake();
+    this.backgroundGeolocation.start();
+ 
+    // set brightness
+    this.brightness.setBrightness(this.globalconfig.dimscreenbrightness/100);
+
     // Subscribe to data receiving as soon as the delimiter is read
-    this.bluetoothSerial.subscribe('>').subscribe(success => {
-      //this.showToast("Succesful subscription");
-     // this.init_communication();
+    this.bluetoothSerial.subscribe('>').subscribe(success => { 
       this.btDataReceived(success);
     }, error => {
-      console.log('Device Connected, Subscribe error: ' + error);
+      console.log('[INFO] Device Connected, Subscribe error: ' + error);
     });
     this.init_communication();
     this.connectInterval(); 
   }
- 
-  showError(error) {
-    /*   let alert = this.alertCtrl.create({
-        title: 'Error',
-        subTitle: error,
-        buttons: ['Dismiss']
-      });
-      alert.present(); */
-    }
-  
-    showToast(msj) { 
-      const toast = this.toastCtrl.create({
-        message: msj,
-        duration: 1000
-      });
-     // toast.present();
-   
-    }
-
+    
     btWrite = function (message, replies) {
       if (replies === undefined) {
           replies = 0;
@@ -385,8 +400,7 @@ saveGlobalConfig () {
                 this.queue.push(message + replies + '\r');
               } else {
                 this.queue.push(message + '\r');
-              }
-              //console.log('Wrote Event: ' + message);
+              } 
           } else {
             this.btEventEmit('error', 'Queue-overflow!');
           }
@@ -451,29 +465,47 @@ saveGlobalConfig () {
       if ( event!=='dataReceived' || text.value === 'NO DATA' || text.name === undefined || text.value === undefined) {
           return;
       }
-      console.log('New metric for ' + text.name);
+      console.log('[INFO] Metric for ' + text.name);
       pdata = {ts:Date.now(),name:text.name,value:text.value};
-      //console.log(JSON.stringify(pdata));
       this.liveStatsNumRecordsSinceConnected++;
       this.execSql('INSERT INTO livemetricstable VALUES (?,?,?,?,?)', [null,pdata.ts, pdata.name, pdata.value, 0],'');
       if (pdata.name=='rpm') { 
         this.lastRPMmetricTimestamp = pdata.ts;
         this.lastRPMmetricvalue = pdata.value;
       }
-      if (this.liveMetrics[pdata.name]==undefined) {
-        var mt =_.findWhere(this.obdmetrics, { name: pdata.name }); 
-        this.liveMetrics[pdata.name]={};
-        this.liveMetrics[pdata.name].description = mt.description;
-        this.liveMetrics[pdata.name].name=mt.name;
-        this.liveMetrics[pdata.name].unit=mt.unit;
-        this.liveMetrics[pdata.name].type='';  
+      if (pdata.name!=='location'){ 
+          if (this.liveMetrics[pdata.name]==undefined) {
+            var mt =_.findWhere(this.obdmetrics, { name: pdata.name }); 
+            this.liveMetrics[pdata.name]={};
+            this.liveMetrics[pdata.name].description = mt.description;
+            this.liveMetrics[pdata.name].name=mt.name;
+            this.liveMetrics[pdata.name].unit=mt.unit;
+            this.liveMetrics[pdata.name].type='';  
+          }
+          this.liveMetrics[pdata.name].value=pdata.value;
+          if (this.liveMetrics[pdata.name].unit=='sec.' || this.liveMetrics[pdata.name].type=='s' ) {
+            this.liveMetrics[pdata.name].value=moment.utc(parseInt(pdata.value)).format('HH:mm:ss'); 
+            this.liveMetrics[pdata.name].unit='';  
+            this.liveMetrics[pdata.name].type='s';  
+          }
+    } else {  // location data
+      if (this.liveMetrics['latitude']==undefined) {
+         this.liveMetrics['latitude']={};
+        this.liveMetrics['latitude'].description = 'Location: latitude';
+        this.liveMetrics['latitude'].name='';
+        this.liveMetrics['latitude'].unit='°'
+        this.liveMetrics['latitude'].type='';          
       }
-      this.liveMetrics[pdata.name].value=pdata.value;
-      if (this.liveMetrics[pdata.name].unit=='sec.' || this.liveMetrics[pdata.name].type=='s' ) {
-        this.liveMetrics[pdata.name].value=moment.utc(parseInt(pdata.value)).format('HH:mm:ss'); 
-        this.liveMetrics[pdata.name].unit='';  
-        this.liveMetrics[pdata.name].type='s';  
+      this.liveMetrics['latitude'].value=  JSON.parse(pdata.value).latitude;
+      if (this.liveMetrics['longitude']==undefined) {
+        this.liveMetrics['longitude']={};
+       this.liveMetrics['longitude'].description = 'Location: longitude';
+       this.liveMetrics['longitude'].name='';
+       this.liveMetrics['longitude'].unit='°'
+       this.liveMetrics['longitude'].type='';          
       }
+      this.liveMetrics['longitude'].value=  JSON.parse(pdata.value).longitude;
+    }
     }
 
     execSql = function (sSql:string,params:string[],logentry:string) {
@@ -483,9 +515,8 @@ saveGlobalConfig () {
         location: 'default'
       }).then((db: SQLiteObject) => {
         db.executeSql(sSql,params)
-        .then(() => {
-          //console.log('DB Executed: ' + logentry);
-           }).catch(e => console.log('Error: ' + e.message));
+        .then(() => { 
+           }).catch(e => console.log('[ERROR] ' + e.message));
       });
     }
 
@@ -517,9 +548,11 @@ saveGlobalConfig () {
       this.btIsConnecting=false;
       this.bluetoothSerial.disconnect();
       this.connstatus="Disconnected";
-      console.log('Disconnected');
+      console.log('[INFO] Disconnected');
       this.liveStatsNumRecordsSinceConnected=0;
       this.lastConnectedToOBD = Date.now();
+      this.backgroundGeolocation.stop();
+ 
     };
     
     requestValueByName = function (name) {
@@ -635,7 +668,7 @@ saveGlobalConfig () {
                     if (this.obdmetrics[i].metricSelectedToPoll===true){
                         this.addPoller(this.obdmetrics[i].name);
                         totalmetrics++;
-                        console.log('Adding poller for ' + this.obdmetrics[i].name);
+                        console.log('[INFO] + poller for ' + this.obdmetrics[i].name);
                     }
                 }  
                 this.pollinginterval = this.totalmetrics * 50 * 4;
@@ -652,13 +685,13 @@ saveGlobalConfig () {
  // Upload Data  -------------------------------------------------------------------------------------------------------
  
 getRecords = async function(db: SQLiteObject) {
-  console.log('Start Get Records...');
+  console.log('[INFO] Start Get Records...');
   return new Promise((resolve, reject) => {
     db.transaction(
           tx => {
             tx.executeSql('SELECT  * FROM livemetricstable LIMIT 1000;', [], (_, {
               rows }) => {
-                console.log('Records found to send: ' + rows.length);
+                console.log('[INFO] Records found to send: ' + rows.length);
                 let data=[];
                 let i;
                 for(i=0;i<rows.length;i++) {
@@ -679,12 +712,17 @@ sendRecords = async function(data):Promise<boolean> {
   let headers = {
     'Content-Type': 'application/json'
   };
-  if (this.globalconfig.dataUpload.mode==='InfluxDB') {
+  if (this.globalconfig.dataUpload.mode==='localserver') {
     url = this.globalconfig.dataUpload.localserver + '/write?db=obdmetrics&precision=ms'; 
     // Set HTTP POST InfluxDB format
     var datainfluxdb='';
     data.forEach(itm => {
-      datainfluxdb = datainfluxdb + itm.name + ' value='  + itm.value + ' ' + itm.ts + '\n'
+      if (itm.name !== 'location') {
+        datainfluxdb = datainfluxdb + itm.name + ' value='  + itm.value + ' ' + itm.ts + '\n';
+      } else {
+        datainfluxdb = datainfluxdb + 'latitude' + ' value='  + JSON.parse(itm.value).latitude + ' ' + itm.ts + '\n';
+        datainfluxdb = datainfluxdb + 'longitude' + ' value='  + JSON.parse(itm.value).longitude + ' ' + itm.ts + '\n';
+      }
     });
     data = datainfluxdb; 
     this.http.setDataSerializer('utf8');
@@ -696,17 +734,17 @@ sendRecords = async function(data):Promise<boolean> {
   try {
     return new Promise((resolve, reject) => {
       this.http.post(url, data, headers, function(response) {
-        console.log('HTTP Success: ' + response.status);
+        console.log('[INFO] HTTP Success: ' + response.status);
         resolve(true);
         return ;
       }, function(response) {
-        console.log('HTTP Error: ' + response.error);
+        console.log('[INFO] HTTP Error: ' + response.error);
         resolve(false);
         return ;
       });
     });
 } catch (error) {
-  console.log('HTTP Post error: ' + error);
+  console.log('[INFO] HTTP Post error: ' + error);
 }}
  
  liveStatsGetRecordsToUpload = function () {
@@ -720,7 +758,7 @@ sendRecords = async function(data):Promise<boolean> {
                     this.liveStatsNumRecordsToSend = data.rows.item(0).countrecs;
                     console.log('Found records to send: ' + this.liveStatsNumRecordsToSend );
                   })
-                  .catch(e => console.log('Error SQL> ' + e)); 
+                  .catch(e => console.log('[ERROR] SQL: ' + e)); 
       });
   };
 
@@ -730,46 +768,42 @@ sendRecords = async function(data):Promise<boolean> {
     location: 'default'
   })
     .then(async (db: SQLiteObject) => {
-       console.log('===========uploadingData = true');
+       console.log('[INFO]  UploadingData');
         this.uploadingData = true; 
 
         while (true) {
             let reslts = await this.getRecords(db);
-            console.log('Finish Get Records...');
+            console.log('[INFO] Finish Get Records...');
 
             if (reslts.length==0){
-              console.log('No records to send found in DB');
-              console.log('===========uploadingData = false, RETURN');
+              console.log('[INFO] No records to send found in DB'); 
               break; 
             }
-            console.log('=========== starting send to backend');
-            if (this.globalconfig.dataUpload.mode=='backend' || this.globalconfig.dataUpload.mode=='InfluxDB' ){
+            console.log('[INFO] Starting send data to backend');
+            if (this.globalconfig.dataUpload.mode=='backend' || this.globalconfig.dataUpload.mode=='localserver' ){
               let success = await this.sendRecords(reslts);
               if (success) {
                 await reslts.forEach( item =>  this.flagSentReslts(db,item));
-                this.changeRef.detectChanges(); 
+                //this.changeRef.detectChanges(); 
               }
             }
             if ( this.globalconfig.dataUpload.mode=='CSV' ){ 
 
                await this.saveDataToCSV(reslts);
-               console.log('=========== setting records as sent - Start');
-               await reslts.forEach( item =>  this.flagSentReslts(db,item));
-               console.log('=========== setting records as sent - END');
-            }
+                await reslts.forEach( item =>  this.flagSentReslts(db,item));
+             }
 
  
-            console.log('=========== finished, next while loop');
-            
+             
       } // while
-        console.log('=========== UploadingData = false, EXIT END OF PROCESS=======');
+        console.log('[INFO]  Exiting processing');
         this.uploadingData=false;
     });
   };
 
   saveDataToCSV = async function (data) { 
      await new Promise(resolve  => {
-    console.log('=========== start send csv'); 
+    console.log('[INFO] Start send to CSV'); 
     let dta:string;
     data.forEach( itm => dta = dta + itm.name + ','  + itm.value + ', ' + itm.ts + '\n');
     let filename =  "obdmetrics-" + new Date().toISOString().split('T')[0] + ".csv";
@@ -783,10 +817,10 @@ sendRecords = async function(data):Promise<boolean> {
               fileWriter.seek(fileWriter.length);
           }
           catch (e) {
-              console.log("file doesn't exist!");
+              console.log("[ERROR] file doesn't exist");
           }
           fileWriter.write(dta);
-          console.log('=========== end send csv');
+          console.log('[INFO] End send to CSV ');
           resolve();
       });  
       })});
@@ -801,16 +835,15 @@ sendRecords = async function(data):Promise<boolean> {
       this.isNetworkConnectivity=true;
     }
       let netDisconnectSubscription = this.network.onDisconnect().subscribe(() => {
-        console.log('wifi network was disconnected');
+        console.log('[INFO] WiFi disconnected');
         this.isNetworkConnectivity=false;
-      });
-      //netDisconnectSubscription.unsubscribe();
+      }); 
 
 
       let netConnectSubscription = this.network.onConnect().subscribe(() => { 
         setTimeout(() => {
           if (this.network.type === 'wifi') {
-            console.log('Connected to Wifi');
+            console.log('[INFO] Connected to Wifi');
             this.isNetworkConnectivity=true;
           }
         }, 3000);
@@ -834,6 +867,7 @@ sendRecords = async function(data):Promise<boolean> {
  }
 
 
+  
 
 }
 

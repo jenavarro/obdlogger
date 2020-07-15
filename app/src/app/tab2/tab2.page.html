@@ -4,77 +4,80 @@
       OBD Logger
     </ion-title>
     <ion-buttons slot="end">
-      <ion-button  (click)="navigateTo('/tabs/tab3')" >    <!--  [routerLink]="['/tabs/tab3']" routerDirection="forward"  -->
-        <ion-icon name="settings" size="small"   ></ion-icon>
+      <ion-button (click)="navigateTo('/tabs/tab3')">
+        <ion-icon name="settings" size="small"></ion-icon>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
- 
-<ion-content fullscreen class="ion-padding"   >
- 
+
+<ion-content fullscreen class="ion-padding">
+
   <ion-list>
     <ion-item>
       <ion-grid>
         <ion-row>
-          <ion-col  >
-        
-            <ion-icon   name="bluetooth" isActive="{{btConnected}}" style="color:gray" *ngIf="btConnected==false"  ></ion-icon>    
-            <ion-icon   name="bluetooth" isActive="{{btConnected}}" style="color:green" *ngIf="btConnected==true"   ></ion-icon>   
-            <ion-label> {{connstatus}} </ion-label> 
-         
+          <ion-col>
+
+            <ion-icon name="bluetooth" isActive="{{btConnected}}" style="color:gray" *ngIf="btConnected==false">
+            </ion-icon>
+            <ion-icon name="bluetooth" isActive="{{btConnected}}" style="color:green" *ngIf="btConnected==true">
+            </ion-icon>
+            <ion-label> {{connstatus}} </ion-label>
+
           </ion-col>
           <ion-col>
 
-            <ion-chip  *ngIf="globalconfig.dataUpload.mode=='localserver'">
-              <ion-icon  name="checkmark-circle"  ></ion-icon>
+            <ion-chip *ngIf="globalconfig.dataUpload.mode=='localserver'">
+              <ion-icon name="checkmark-circle"></ion-icon>
               <ion-label>InfluxDB</ion-label>
             </ion-chip>
-            <ion-chip  *ngIf="globalconfig.dataUpload.mode=='backend'" >
-              <ion-icon   name="checkmark-circle"  ></ion-icon>
+            <ion-chip *ngIf="globalconfig.dataUpload.mode=='backend'">
+              <ion-icon name="checkmark-circle"></ion-icon>
               <ion-label>Cloud </ion-label>
             </ion-chip>
-            <ion-chip *ngIf="globalconfig.dataUpload.mode=='csv'">
-              <ion-icon   name="checkmark-circle"     ></ion-icon>
+            <ion-chip *ngIf="globalconfig.dataUpload.mode=='CSV'">
+              <ion-icon name="checkmark-circle"></ion-icon>
               <ion-label>CSV</ion-label>
             </ion-chip>
           </ion-col>
-          
+
         </ion-row>
         <ion-row>
-          <ion-col  >
- 
-          </ion-col>
-         <!-- <ion-col>
-            <span><ion-badge   color="primary">{{this.globalconfig.obdmetrics.length}}</ion-badge> metrics collected</span>
-          </ion-col>  -->
-        </ion-row>
-      <ion-row>
-        <ion-col>
-          <div>
-           <ion-badge    slot="start">{{liveStatsNumRecordsSinceConnected}} </ion-badge> metrics
-          <ion-label> since connected</ion-label>
-        </div>
-         </ion-col>
-        <ion-col>
-           <div>
-            <ion-badge    slot="start">{{liveStatsNumRecordsToSend}} </ion-badge> metrics
-           <ion-label> to upload</ion-label>
-         </div>
-        </ion-col>
-  
-      </ion-row>
-    </ion-grid>
-  </ion-item>
-</ion-list>
-<ion-list   >
-  <ion-list-header>Live Data</ion-list-header> 
-  <ion-item *ngFor="let i of liveMetrics | keyvalue"  > 
-    <ion-label>{{i.value.description}}</ion-label>
-   <strong> <ion-note   slot="end" color="primary" *ngIf="i.value.type==''">{{i.value.value | number:'1.0-1'}} {{i.value.unit}}</ion-note> </strong>
-   <strong> <ion-note   slot="end" color="primary" *ngIf="i.value.type=='s'">{{i.value.value }} {{i.value.unit}}</ion-note>  </strong>
-   </ion-item>
-</ion-list>
-</ion-content>
-   
+          <ion-col>
 
+          </ion-col>
+
+        </ion-row>
+        <ion-row>
+          <ion-col>
+            <div>
+              <ion-badge slot="start">{{liveStatsNumRecordsSinceConnected}} </ion-badge> metrics
+              <ion-label> since connected</ion-label>
+            </div>
+          </ion-col>
+          <ion-col>
+            <div>
+              <ion-badge slot="start">{{liveStatsNumRecordsToSend}} </ion-badge> metrics
+              <ion-label> to upload</ion-label>
+            </div>
+          </ion-col>
+
+        </ion-row>
+      </ion-grid>
+    </ion-item>
+  </ion-list>
+  <ion-list>
+    <ion-list-header>Live Data</ion-list-header>
+    <ion-item *ngFor="let i of liveMetrics | keyvalue">
+      <ion-label>{{i.value.description}}</ion-label>
+      <strong>
+        <ion-note slot="end" color="primary" *ngIf="i.value.type==''">{{i.value.value | number:'1.0-1'}}
+          {{i.value.unit}}</ion-note>
+      </strong>
+      <strong>
+        <ion-note slot="end" color="primary" *ngIf="i.value.type=='s'">{{i.value.value }} {{i.value.unit}}</ion-note>
+      </strong>
+    </ion-item>
+  </ion-list>
+</ion-content>

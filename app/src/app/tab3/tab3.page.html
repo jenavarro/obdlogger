@@ -44,8 +44,8 @@
           <ion-icon   name="checkmark-circle"   *ngIf="globalconfig.dataUpload.mode=='backend'" ></ion-icon>
           <ion-label>Cloud </ion-label>
         </ion-chip>
-        <ion-chip  (click)="selectDataUpload('csv')">
-          <ion-icon   name="checkmark-circle"    *ngIf="globalconfig.dataUpload.mode=='csv'" ></ion-icon>
+        <ion-chip  (click)="selectDataUpload('CSV')">
+          <ion-icon   name="checkmark-circle"    *ngIf="globalconfig.dataUpload.mode=='CSV'" ></ion-icon>
           <ion-label>CSV</ion-label>
         </ion-chip>
       </p>
@@ -63,7 +63,16 @@
         <ion-input type="url" inputmode="url" name="localserver"  [(ngModel)]="globalconfig.dataUpload.localserver"  (ionChange)="configDataUpload()"></ion-input>
       </ion-item>  
     </ion-list>
-    
+    <p></p>
+    <ion-list   >
+      <ion-list-header>Auto dim screen brightness when connected</ion-list-header> 
+    <ion-item>
+       <ion-range    [(ngModel)]="globalconfig.dimscreenbrightness" (ionChange)="setBrightness()" >
+        <ion-icon slot="start" size="small" name="sunny"></ion-icon>
+        <ion-icon slot="end" name="sunny"></ion-icon>
+      </ion-range>
+    </ion-item> 
+    </ion-list>
       <ion-list  ngDefaultControl >
         <ion-list-header>Metrics</ion-list-header> 
         <ion-item *ngFor="let i of obdmetrics;let j=index"  > 
@@ -76,9 +85,7 @@
         <header> </header>
         <ion-button (click)="resetMetrics()" expand="block"><ion-icon name="refresh"></ion-icon>Reset to Most Used Metrics</ion-button>
         <ion-button (click)="dropDBTables()" expand="block"><ion-icon name="refresh"></ion-icon>Reset metrics DB</ion-button>
-      <!--<p></p>
-      <ion-button (click)="fakedata()" expand="block"><ion-icon name="refresh"></ion-icon>Insert fake data</ion-button>
-      -->
+ 
     
       </section>
   </ion-content>

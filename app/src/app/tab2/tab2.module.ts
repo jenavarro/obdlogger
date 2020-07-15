@@ -9,10 +9,12 @@ import { Component } from '@angular/core';
 import { SQLiteObject, SQLite } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
 import { HTTP } from '@ionic-native/http/ngx'; 
-import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
-import { BackgroundMode } from '@ionic-native/background-mode/ngx';
+import { CloudSettings } from '@ionic-native/cloud-settings/ngx'; 
+import { Insomnia } from '@ionic-native/insomnia/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
 import { File } from '@ionic-native/file/ngx';
+import { BackgroundGeolocation, BackgroundGeolocationConfig, BackgroundGeolocationEvents, BackgroundGeolocationResponse } from '@ionic-native/background-geolocation/ngx';
+import { Brightness } from '@ionic-native/brightness/ngx';
 
 @NgModule({
   imports: [
@@ -23,10 +25,9 @@ import { File } from '@ionic-native/file/ngx';
     IonicStorageModule.forRoot()  
   ],
   declarations: [Tab2Page], 
-  providers: [  File, SQLite,Network,HTTP, CloudSettings ,BackgroundMode, BatteryStatus],
+  providers: [  File, SQLite,Network,HTTP, CloudSettings ,Insomnia, BatteryStatus,BackgroundGeolocation,Brightness],
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Tab2PageModule {}
-
- 
+  
  

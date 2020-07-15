@@ -12,6 +12,7 @@ import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
 import { BackgroundMode } from '@ionic-native/background-mode/ngx';
 import { BatteryStatus } from '@ionic-native/battery-status/ngx';
 import { File } from '@ionic-native/file/ngx';
+import { Brightness } from '@ionic-native/brightness/ngx';
 
 @NgModule({
   imports: [
@@ -21,7 +22,7 @@ import { File } from '@ionic-native/file/ngx';
     RouterModule.forChild([{ path: '', component: Tab3Page }])
   ],
   declarations: [Tab3Page],
-  providers: [Tab2Page,File, SQLite,Network,HTTP, CloudSettings ,BackgroundMode, BatteryStatus],
+  providers: [Tab2Page,File, SQLite,Network,HTTP, CloudSettings ,BackgroundMode, BatteryStatus, Brightness],
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Tab3PageModule {}

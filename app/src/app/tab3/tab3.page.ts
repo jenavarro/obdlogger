@@ -4,7 +4,8 @@ import { BluetoothSerial } from '@ionic-native/bluetooth-serial/ngx';
 import { AlertController, ToastController } from '@ionic/angular';
 import { obdinfo } from '../tab2/obdInfo.js';
 import { CloudSettings } from '@ionic-native/cloud-settings/ngx';
-
+import { Brightness } from '@ionic-native/brightness/ngx';
+import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
 
 @Component({
   selector: 'app-tab3',
@@ -54,10 +55,11 @@ export class Tab3Page {
       obdmetrics: [], 
       dataUpload:{apikey:'',apisecret:'',localserver:'',mode:''},
       bluetoothDeviceToUse : {address:'', devicename: ''},
-      sendstatusinfo:false
+      sendstatusinfo:false,
+      dimscreenbrightness:50
     };
      
-  constructor( private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController) {
+  constructor(private brightness: Brightness, private sqlite: SQLite, private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController) {
     this.obdmetrics=[];
     this.targetList= ['InfluxDB','CSV'];
     this.loadGlobalConfig();
@@ -72,8 +74,7 @@ export class Tab3Page {
     console.log('Changed BT device to use:' + this.pairedList[ev.detail.value].name);
     this.globalconfig.bluetoothDeviceToUse = {address:this.pairedList[ev.detail.value].address, devicename:this.pairedList[ev.detail.value].name};
     this.saveGlobalConfig();
-    //this.btDisconnect();
-    //this.connect(this.pairedList[ev.detail.value].address, this.pairedList[ev.detail.value].name);
+    
 }
   
 loadGlobalConfig() {
@@ -102,6 +103,10 @@ this.cloudSettings.exists()
   }); 
 }
 
+setBrightness() {
+  this.brightness.setBrightness(this.globalconfig.dimscreenbrightness/100);
+  this.saveGlobalConfig();
+}
 configureMetricsList() {
   for (var k=0;k<obdinfo.PIDS.length;k++){
     var itm = obdinfo.PIDS[k];
@@ -198,7 +203,22 @@ configDataUpload = function() {
   this.saveGlobalConfig();   
 }
 
- 
+dropDBTables(){
+  this.sqlite.create({
+    name: 'data.db',
+    location: 'default'
+  })
+    .then((db: SQLiteObject) => {
+   
+  
+      db.executeSql('DELETE FROM livemetricstable  ')
+      .then(() => { 
+        console.log('[INFO] DELETED Content of table livemetrics');
+         }).catch(e => console.log("[ERROR]  " + JSON.stringify(e)));
+          
+    })
+    .catch(e => console.log("[ERROR]  " + JSON.stringify(e)));
+} 
 
 
 }

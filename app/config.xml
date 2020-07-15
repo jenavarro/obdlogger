@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.qridr.obdlogger" version="0.0.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="com.qridr.obdlogger" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>OBD Logger</name>
     <description>OBD Logger</description>
     <author email="hi@ionicframework.com" href="http://ionicframework.com/">Ionic Framework Team</author>
-    <content original-src="index.html" src="http://localhost:8100" />
+    <content src="index.html" />
     <access origin="*" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
@@ -111,6 +111,14 @@
     <plugin name="cordova-plugin-ionic-keyboard" spec="^2.0.5" />
     <plugin name="cordova-plugin-cloud-settings" spec="*">
         <variable name="ANDROID_BACKUP_SERVICE_KEY" value="AEdPqrEAAAAITmrvs78xLVR4HK5oJtFUZ2cQbugUhElIkH56mQ" />
+    </plugin>
+    <plugin name="cordova-plugin-background-geolocation" spec="@mauron85/cordova-plugin-background-geolocation@~3.1.0">
+        <variable name="GOOGLE_PLAY_SERVICES_VERSION" value="11+" />
+        <variable name="ANDROID_SUPPORT_LIBRARY_VERSION" value="26+" />
+        <variable name="ICON" value="@mipmap/icon" />
+        <variable name="SMALL_ICON" value="@mipmap/icon" />
+        <variable name="ALWAYS_USAGE_DESCRIPTION" value="App requires background tracking " />
+        <variable name="MOTION_USAGE_DESCRIPTION" value="App requires motion detection" />
     </plugin>
     <allow-navigation href="http://localhost:8100" sessionid="4b4f98f6" />
     <allow-navigation href="http://localhost:8080/*" />
