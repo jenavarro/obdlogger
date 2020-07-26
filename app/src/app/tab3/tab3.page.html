@@ -59,9 +59,13 @@
         <ion-input type="text" name="apisecret"  [(ngModel)]="globalconfig.dataUpload.apisecret"  (ionChange)="configDataUpload()"></ion-input>
       </ion-item>
       <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
-        <ion-label floating>Influx Server Host:</ion-label>
+        <ion-label floating>Influx host:port</ion-label>
         <ion-input type="url" inputmode="url" name="localserver"  [(ngModel)]="globalconfig.dataUpload.localserver"  (ionChange)="configDataUpload()"></ion-input>
-      </ion-item>  
+      </ion-item>
+      <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
+          <ion-label>Skip TLS verify</ion-label>
+          <ion-toggle slot="end"   color="success" [(ngModel)]="globalconfig.dataUpload.localserverdisablecert" (ionChange)="saveMetricsCfg()" ></ion-toggle>
+      </ion-item>        
     </ion-list>
     <p></p>
     <ion-list   >

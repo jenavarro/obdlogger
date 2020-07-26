@@ -174,25 +174,15 @@ saveMetricsCfg( ) {
   }
  
   
-  showError(error) {/*
-        let alert = this.alertCtrl.create({
-        title: 'Error',
-        subTitle: error,
-        buttons: ['Dismiss']
+  async showError(error) {
+        let  alert = await this.alertCtrl.create({
+        message: error ,
+        subHeader: 'Error',
+        buttons: ['OK']
       });
-      alert.present(); */
+      await alert.present(); 
     }
-  
-    showToast(msj) { 
-      const toast = this.toastCtrl.create({
-        message: msj,
-        duration: 1000
-      });
-     // toast.present();
-   
-    }
- 
-        
+          
 selectDataUpload = function(data) {
   if (data== undefined) return;
   this.globalconfig.dataUpload.mode=  data ;
@@ -200,6 +190,9 @@ selectDataUpload = function(data) {
   console.log('Changed default upload mode to ' + data);
 }
 configDataUpload = function() {
+  if (this.globalconfig.dataUpload.localserver.includes('http:')) {
+    this.showError('Non-secure communication to http:// is not allowed, please use https://')
+  }
   this.saveGlobalConfig();   
 }
 

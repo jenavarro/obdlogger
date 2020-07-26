@@ -192,7 +192,7 @@ public static convertFuelSystem(byteA, byteB){
     if( byteB ){
         reply.system2 = obdinfo.bitDecoder(byteB);
     }
-    return reply;
+    return reply.system1;
 }
 public static convertDTCCheck(byteA, byteB, byteC, byteD) {
     //ByteB, ByteC and ByteD are not read. These bytes are for testing purposes, which is not supported in this module.

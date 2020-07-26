@@ -8,25 +8,40 @@ Project Details
 
 This is an HTML5 Cordova app that runs in iOS and Android (so far tested only in Android). 
 The app connects via Bluetooth to an ELM327C OBD Connector plugged in the OBD port in any car.
-The app will collect live metrics from the car on-board diagnostic computer -RPM, speed, fuel consumption, etc.- and save & upload them to Google Sheets for further processing.
+The app will collect live metrics from the car on-board diagnostic computer -RPM, speed, fuel consumption, etc.- and save locally to a sqlite database. It will export to CSV file or an InfluxDB time-series database.
 
 This app is more a proof-of-concept than a stable, feature rich application.
 
 This software is heavily based on the npm module [bluetooth-obd](https://www.npmjs.com/package/bluetooth-obd) authored by Eric Smekens and licensed as Apache License 2.0
 
 ### Main Features
-* Allow capturing live metrics reported by the car engine
-* Allows storing locally and uploading them to a selected Google Spreadsheet via an API
-* App detects connection to only enable data upload over wi-fi to prevent data plan consumption.
+* Data Capturing
+    * Allow capturing live metrics reported by the car engine
+    * Can select one of available Bluetooth devices
+    * Displays number of metrics stored since connected
+    * Displays number of metrics to be uploaded
+* Data export
+    * Allows exporting data locally to a CSV file
+    * Allows exporting data to an influxDB (time-series) database
+        Note: HTTPS api for InfluxDB needs to be configured
+* Environment detection
+    * Keeping bluetooth enabled while capturing data will make the device to never go to sleep.
+    * As soon connectivity is lost it will allow again the phone to go to sleep
+    * If there is no wifi, it will not attempt to send data to InfluxDB - to avoid incurring in cell data plan costs. Will attempt to send data once wifi connectivity is detected
 
 Refer to this [wiki](https://github.com/jenavarro/OBDLogger/wiki) page on GitHub for additional information.
 Refer to this [wiki](https://github.com/jenavarro/obdlogger/wiki/Configuring-Data-upload) for data upload configuration.
 
+### Main and Configuration panels
+
+<img src="https://user-images.githubusercontent.com/7155108/88468428-dd94a780-ceb9-11ea-8485-c4a6bc96e525.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468428-dd94a780-ceb9-11ea-8485-c4a6bc96e525.jpg" width="200" height="400" />
+<img src="https://user-images.githubusercontent.com/7155108/88468430-e4231f00-ceb9-11ea-97c2-451091a3fa76.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468430-e4231f00-ceb9-11ea-97c2-451091a3fa76.jpg" width="200" height="400" />
+<img src="https://user-images.githubusercontent.com/7155108/88468431-e4bbb580-ceb9-11ea-9be3-9f8919566bb4.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468431-e4bbb580-ceb9-11ea-9be3-9f8919566bb4.jpg" width="200" height="400" />
+
 ### Technologies used
-* HTML5 Cordova app authored in the Intel XDK IDE
-* Bluetooth communication: cordova-plugin-bluetooth-serial
-* Local data storage: cordova-plugin-file
-* For detecting wifi-connectivity: cordova-plugin-network-information
+* [Ionic Framework](http://ionicframework.com/)
+* [Visual Studio Code] (https://code.visualstudio.com)
+
 
 ### PIDs read from the OBD
 * HTML5 Cordova app authored in the Intel XDK IDE

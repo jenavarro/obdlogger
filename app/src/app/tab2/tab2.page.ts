@@ -77,7 +77,7 @@ export class Tab2Page {
   liveStatsBattery={level:-1,isPlugged:false, lastUnplugged:0}; 
   globalconfig={
       obdmetrics: [], 
-      dataUpload:{apikey:'',apisecret:'',localserver:'',mode:''},
+      dataUpload:{apikey:'',apisecret:'',localserver:'',mode:'',localserverdisablecert:false},
       bluetoothDeviceToUse : {address:'', devicename: ''},
       sendstatusinfo:false,
       gpsTracking:true,
@@ -91,6 +91,7 @@ export class Tab2Page {
       this.targetList= ['InfluxDB','CSV'];
 
       this.lastConnectedToOBD = Date.now();
+
       this.loadGlobalConfig();
       this.setupDb();
       this.subscribeToNetworkChanges();
@@ -108,6 +109,7 @@ export class Tab2Page {
   constructor(private brightness: Brightness,private insomnia: Insomnia, private backgroundGeolocation: BackgroundGeolocation,  private file:File , private batteryStatus: BatteryStatus,private cloudSettings: CloudSettings, public navCtrl: NavController, private alertCtrl: AlertController, private bluetoothSerial: BluetoothSerial, private toastCtrl: ToastController, private sqlite: SQLite, private network: Network, private http: HTTP) {
 
     this.startMain();
+
   }
 
   navigateTo(page) {
@@ -279,28 +281,33 @@ export class Tab2Page {
 loadGlobalConfig() {
   this.cloudSettings.enableDebug( );
  
-this.cloudSettings.exists()
-.then((exists: boolean) => { 
-  if (!exists) {
-    this.saveGlobalConfig();
-    console.error('[INFO] Global config does not exist');
+  this.cloudSettings.exists()
+  .then((exists: boolean) => { 
+    if (!exists) {
+      this.saveGlobalConfig();
+      console.error('[INFO] Global config does not exist');
 
-  } else { 
-  this.cloudSettings.load()
-    .then((settings: any) => {
-      // OBD Metrics configuration
-      this.globalconfig = JSON.parse(settings.data);
-      console.log('[INFO] Saved settings loaded: ' + JSON.stringify(settings));
-      if (this.globalconfig.obdmetrics !== undefined) {
+    } else { 
+    this.cloudSettings.load()
+      .then((settings: any) => {
+        // OBD Metrics configuration
+        this.globalconfig = JSON.parse(settings.data);
+        console.log('[INFO] Saved settings loaded: ' + JSON.stringify(settings));
+        if (this.globalconfig.obdmetrics !== undefined) {
+          this.configureMetricsList();
+        } 
+        if (this.globalconfig.dataUpload.localserverdisablecert) {          
+          this.http.setServerTrustMode('nocheck').then( (res) =>{
+          console.log('Disabled http cert verification: ' + res);
+      });
+        }
+      } )
+      .catch((error: any) => {
         this.configureMetricsList();
-      } 
-    } )
-    .catch((error: any) => {
-      this.configureMetricsList();
-      console.error('[INFO] Error retrieving global configuration ' + error);
-    });
-  }
-   }); 
+        console.error('[INFO] Error retrieving global configuration ' + error);
+      });
+    }
+    }); 
 }
 
 configureMetricsList() {
@@ -718,7 +725,9 @@ sendRecords = async function(data):Promise<boolean> {
     var datainfluxdb='';
     data.forEach(itm => {
       if (itm.name !== 'location') {
-        datainfluxdb = datainfluxdb + itm.name + ' value='  + itm.value + ' ' + itm.ts + '\n';
+        if (!isNaN(itm.value)) {
+          datainfluxdb = datainfluxdb + itm.name + ' value='  + itm.value + ' ' + itm.ts + '\n';
+        }
       } else {
         datainfluxdb = datainfluxdb + 'latitude' + ' value='  + JSON.parse(itm.value).latitude + ' ' + itm.ts + '\n';
         datainfluxdb = datainfluxdb + 'longitude' + ' value='  + JSON.parse(itm.value).longitude + ' ' + itm.ts + '\n';
