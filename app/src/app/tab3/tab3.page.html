@@ -59,7 +59,7 @@
         <ion-input type="text" name="apisecret"  [(ngModel)]="globalconfig.dataUpload.apisecret"  (ionChange)="configDataUpload()"></ion-input>
       </ion-item>
       <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
-        <ion-label floating>Influx host:port</ion-label>
+        <ion-label floating>InfluxDB host:port</ion-label>
         <ion-input type="url" inputmode="url" name="localserver"  [(ngModel)]="globalconfig.dataUpload.localserver"  (ionChange)="configDataUpload()"></ion-input>
       </ion-item>
       <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
