@@ -1,0 +1,97 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button default-href="/tabs/tab2" [routerLink]="['/tabs/tab2']"></ion-back-button>
+    </ion-buttons>
+    <ion-title>
+      Configuration
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+ 
+  <ion-content fullscreen class="ion-padding">
+ 
+    <ion-grid>
+      <ion-row>
+        <ion-col>
+           <ion-icon   name="bluetooth"   style="color:blue" class="ion-iconXL"  ></ion-icon>               <br>
+            <ion-label> {{connstatus}} </ion-label> 
+            <ion-label> </ion-label> 
+            <ion-select [(ngModel)]="pairedDeviceID"(ionChange)="selectBtDevice($event)" (ionFocus)="checkBluetoothEnabled()" [selectedText]="globalconfig.bluetoothDeviceToUse.devicename.substring(0,16) "  placeholder="Select device">  
+              <ion-select-option *ngFor="let i of pairedList;let j=index" value="{{j}}" selected="{{i.isSelected}}"  >
+                <span>{{i.name}}</span>
+               </ion-select-option>
+             </ion-select>
+          </ion-col>
+  
+        
+      </ion-row> 
+      <p></p>
+  
+    </ion-grid>
+    
+    <ion-list>
+      <ion-list-header>
+        Send / Save engine data to:
+      </ion-list-header>
+    
+      <p  >
+        <ion-chip   (click)="selectDataUpload('localserver')">
+          <ion-icon  name="checkmark-circle"  *ngIf="globalconfig.dataUpload.mode=='localserver'" ></ion-icon>
+          <ion-label>InfluxDB (HTTP)</ion-label>
+        </ion-chip>
+        <ion-chip  (click)="selectDataUpload('backend')" >
+          <ion-icon   name="checkmark-circle"   *ngIf="globalconfig.dataUpload.mode=='backend'" ></ion-icon>
+          <ion-label>Cloud </ion-label>
+        </ion-chip>
+        <ion-chip  (click)="selectDataUpload('CSV')">
+          <ion-icon   name="checkmark-circle"    *ngIf="globalconfig.dataUpload.mode=='CSV'" ></ion-icon>
+          <ion-label>CSV</ion-label>
+        </ion-chip>
+      </p>
+    
+      <ion-item *ngIf="globalconfig.dataUpload.mode=='backend'">
+        <ion-label floating>Service API Key:</ion-label>
+        <ion-input type="text" name="apikey"  [(ngModel)]="globalconfig.dataUpload.apikey"  (ionChange)="configDataUpload()"></ion-input>
+      </ion-item>
+      <ion-item *ngIf="globalconfig.dataUpload.mode=='backend'">
+        <ion-label floating>Service API Secret:</ion-label>
+        <ion-input type="text" name="apisecret"  [(ngModel)]="globalconfig.dataUpload.apisecret"  (ionChange)="configDataUpload()"></ion-input>
+      </ion-item>
+      <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
+        <ion-label floating>InfluxDB host:port</ion-label>
+        <ion-input type="url" inputmode="url" name="localserver"  [(ngModel)]="globalconfig.dataUpload.localserver"  (ionChange)="configDataUpload()"></ion-input>
+      </ion-item>
+      <ion-item *ngIf="globalconfig.dataUpload.mode=='localserver'">
+          <ion-label>Skip TLS verify</ion-label>
+          <ion-toggle slot="end"   color="success" [(ngModel)]="globalconfig.dataUpload.localserverdisablecert" (ionChange)="saveMetricsCfg()" ></ion-toggle>
+      </ion-item>        
+    </ion-list>
+    <p></p>
+    <ion-list   >
+      <ion-list-header>Auto dim screen brightness when connected</ion-list-header> 
+    <ion-item>
+       <ion-range    [(ngModel)]="globalconfig.dimscreenbrightness" (ionChange)="setBrightness()" >
+        <ion-icon slot="start" size="small" name="sunny"></ion-icon>
+        <ion-icon slot="end" name="sunny"></ion-icon>
+      </ion-range>
+    </ion-item> 
+    </ion-list>
+      <ion-list  ngDefaultControl >
+        <ion-list-header>Metrics</ion-list-header> 
+        <ion-item *ngFor="let i of obdmetrics;let j=index"  > 
+          <ion-label>{{i.description}}</ion-label>
+          <ion-toggle slot="end"   color="success" [(ngModel)]="i.metricSelectedToPoll" (ionChange)="saveMetricsCfg()" [disabled]="i.name==='rpm'"></ion-toggle>
+        </ion-item>
+      </ion-list>
+      
+      <section>
+        <header> </header>
+        <ion-button (click)="resetMetrics()" expand="block"><ion-icon name="refresh"></ion-icon>Reset to Most Used Metrics</ion-button>
+        <ion-button (click)="dropDBTables()" expand="block"><ion-icon name="refresh"></ion-icon>Reset metrics DB</ion-button>
+ 
+    
+      </section>
+  </ion-content>
+
+   
