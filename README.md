@@ -35,7 +35,7 @@ Refer to this [wiki](https://github.com/jenavarro/obdlogger/wiki/Configuring-Dat
 
 ### Main and Configuration panels
 <p float="left">
-<img src="https://user-images.githubusercontent.com/7155108/88468428-dd94a780-ceb9-11ea-8485-c4a6bc96e525.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468428-dd94a780-ceb9-11ea-8485-c4a6bc96e525.jpg" width="200" height="400" />
+<img src="https://user-images.githubusercontent.com/7155108/89240388-54c0ee80-d5d2-11ea-8410-6a88c8ba8af7.png" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468428-dd94a780-ceb9-11ea-8485-c4a6bc96e525.jpg" width="200" height="400" />
 <img src="https://user-images.githubusercontent.com/7155108/88468430-e4231f00-ceb9-11ea-97c2-451091a3fa76.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468430-e4231f00-ceb9-11ea-97c2-451091a3fa76.jpg" width="200" height="400" />
 <img src="https://user-images.githubusercontent.com/7155108/88468431-e4bbb580-ceb9-11ea-9be3-9f8919566bb4.jpg" data-canonical-src="https://user-images.githubusercontent.com/7155108/88468431-e4bbb580-ceb9-11ea-9be3-9f8919566bb4.jpg" width="200" height="400" />
 </p>
