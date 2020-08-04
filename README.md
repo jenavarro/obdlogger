@@ -17,6 +17,7 @@ This software is heavily based on the npm module [bluetooth-obd](https://www.npm
 ### Main Features
 * Data Capturing
     * Allow capturing live metrics reported by the car engine
+    * Captures GPS location periodically and saves as metrics.
     * Can select one of available Bluetooth devices
     * Displays number of metrics stored since connected
     * Displays number of metrics to be uploaded
