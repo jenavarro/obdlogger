@@ -42,6 +42,46 @@ Refer to this [wiki](https://github.com/jenavarro/obdlogger/wiki/Configuring-Dat
 * [Ionic Framework](http://ionicframework.com/)
 * [Visual Studio Code] (https://code.visualstudio.com)
 
+## Build & Install
+Generated .apk is available in Releases tab. In case you want to build from source:
+
+1. Download and install Android studio.
+2. `npm install`
+3. `cd app`
+4. `scripts\build.bat`
+
+## Hardware
+Running the app requires a OBD bluetooth connector plugged in the OBD-CAN connector of the car. ELM 327 is the model tested with this version of the app, it costs USD 10-15 in [Amazon] (https://www.amazon.com/Bluetooth-Scanner-Adapter-Diagnostic-Android/dp/B019SURWYO).
+
+## Configuration
+1. Plug the OBD connector.
+1. Search Bluetooth devices, connect from the mobile phone to it (follow instructions from manufacturer).
+1. Run the OBD Logger app, in "Configuration" select the Bluetooth device from the drop-down combo and select the metrics to read, e.g. RPM, Speed, etc.
+1. Select the Main screen, wait until the message showing connection was OK.
+1. The metrics will start to show up, updated every second.
+
+## Testing with a simulator
+
+If a OBD reader device is not available, it can be simulated using a special simulator [ObdSim] (https://icculus.org/obdgpslogger/obdsim.html):
+For Linux/Mac, follow instructions on the [website] (https://icculus.org/obdgpslogger/obdsim.html).
+For Windows:
+
+1. Download .zip from [here] (https://icculus.org/obdgpslogger/downloads/obdsimwindows-latest.zip)
+2. Unzip to any folder
+3. Open Bluetooth Settings, click on "COM Ports"
+4. Click "Add...", then "Inbound"
+5. Open a command line window, go to folder where obdsim was unzipped
+6. `odbsim -w COMx`   Replace x with the specific COM port created in previous step.
+7. A window is opened showing 5 dials that can be changed manually, those will be the values offered to the device
+8. On the mobile device, pair the Bluetooth connection to the Windows PC where the simulator is running.
+9. Configure the OBD Logger app to use this alternate Bluetooth Connector, select metrics
+10. Play with the dials and see how the values change in the OBD logger app.
+
+## Usage: Uploading data to InfluxDB
+Select InfluxDB in the target option. Provide an InfluxDB host and port 
+
+## Usage: Uploading data to CSV
+Select CSV in the target option. Data will be saved to data/android/obdlogger/data folder in the phone. A single .csv per day will be created and data for that day will be appended
 
 ### PIDs read from the OBD
 * HTML5 Cordova app authored in the Intel XDK IDE
