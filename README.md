@@ -53,7 +53,7 @@ Generated .apk is available in Releases tab. In case you want to build from sour
 4. `scripts\build.bat`
 
 ## Hardware
-Running the app requires a OBD bluetooth connector plugged in the OBD-CAN connector of the car. ELM 327 is the model tested with this version of the app, it costs USD 10-15 in [Amazon] (https://www.amazon.com/Bluetooth-Scanner-Adapter-Diagnostic-Android/dp/B019SURWYO).
+Running the app requires a OBD bluetooth connector plugged in the OBD-CAN connector of the car. ELM 327 is the model tested with this version of the app, it costs USD 10-15 in [Amazon](https://www.amazon.com/s?k=bluetooth+obd+2+connector).
 
 ## Configuration
 1. Plug the OBD connector.
